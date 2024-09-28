@@ -1,5 +1,6 @@
 -Q Formalization StableCoinFormalization
 
-Formalization/Datatypes.v
 Formalization/HelperFunctions.v
+Formalization/Datatypes.v
 Formalization/Functions.v
+Formalization/HelperLemmas.v

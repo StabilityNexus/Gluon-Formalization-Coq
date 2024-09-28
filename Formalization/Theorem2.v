@@ -5,7 +5,7 @@ From StableCoinFormalization Require Export HelperLemmas.
 Require Export Lqa.
 Require Export Lia.
 
-Module Theorem1.
+Module Theorem2.
     Import Datatypes.
     Import HelperFunctions.
     Import HelperLemmas.
@@ -61,18 +61,9 @@ Module Theorem1.
             apply Qnot_eq_sym. apply Qlt_not_eq. apply Hnu.
         Qed.
 
-    (*
-     * state_0: state when the seller makes the offer
-     * state_1: state just before when any potential buyer performs the beta + 
-                reaction after the fission reaction. We are assuming the state_1
-                occurs later in time compared to state_0 and need to state this
-                assumption accordingly. 
-     * timestamp: timestamp when any potential buyer performs the beta + 
-                  reaction after the fission reaction. timestamp > timestamp
-                  of the most recent reaction according to state_1
-     * offer: offer which the seller makes
-     *)
-    Theorem peg_maintenance_upper_bound :
+    
+
+    Theorem peg_maintenance_lower_bound :
         forall
             (timestamp : nat) 
             (state_0 : State)
@@ -80,18 +71,17 @@ Module Theorem1.
             (offer : Offer),
             (1 / extract_value (qStar)) < 
             (reserve_ratio (state_0.(stableCoinState))) /\
-            offer.(action) = SellStableCoin /\
-            ((1 + get_effective_fee (timestamp) (state_0) (state_1) (BuyStableCoin)) * 
-            target_price (state_0.(stableCoinState))) < 
+            offer.(action) = BuyStableCoin /\
+            ((1 - get_effective_fee (timestamp) (state_0) (state_1) (SellStableCoin)) * 
+            target_price (state_0.(stableCoinState))) > 
             (extract_value (offer.(value))) /\
-            (get_effective_fee (timestamp) (state_0) (state_1) (BuyStableCoin) >= 0)
+            (get_effective_fee (timestamp) (state_0) (state_1) (SellStableCoin) >= 0)
             ->
-            (get_rational_choice (BuyStableCoin) 
-            (get_primary_market_offer (timestamp) (state_0) (state_1) (BuyStableCoin)) 
+            (get_rational_choice (SellStableCoin) 
+            (get_primary_market_offer (timestamp) (state_0) (state_1) (SellStableCoin)) 
             (extract_value (offer.(value))) = Secondary -> False) /\
-            get_effective_fee (timestamp) (state_0) (state_1) (BuyStableCoin) <=
-            (1 / ((1 - extract_value (fissionFee)) * (1 - beta_decay_pos_fee (state_1) (timestamp)))) *
-            (reserve_ratio (state_0.(stableCoinState)) / ((reserve_ratio (state_1.(stableCoinState))) - 1)) - 1.
+            get_effective_fee (timestamp) (state_0) (state_1) (SellStableCoin) <=
+            (1 - (1 - extract_value (fusionFee)) * (1 - beta_decay_neg_fee (state_0) (timestamp))).
     
     Proof.
         intros. split.
@@ -105,7 +95,7 @@ Module Theorem1.
           * apply nonnegative_plus_nonnegative.
             + unfold Qle. simpl. lia.
             + apply H4.
-        - destruct H as [H1 [H2 [H3 H4]]]. simpl. 
+        -  
     Qed.
     
 End Theorem1.
