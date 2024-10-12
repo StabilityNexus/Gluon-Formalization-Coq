@@ -4,10 +4,12 @@
 From StableCoinFormalization Require Export Datatypes.
 From StableCoinFormalization Require Export HelperFunctions.
 
+Local Open Scope R_scope.
+
 Module Functions.
-    Import Qminmax.
     Import Datatypes.
     Import HelperFunctions.
+    Import Bool.
 
     (*
      * Defining Parameters
@@ -28,6 +30,13 @@ Module Functions.
         let betaDecayFeeNegVal := extract_value (betaDecayFeeNeg) in
         (0 < betaDecayFeePosVal + betaDecayFeeNegVal <= 1).
     
+    Axiom reactorstate_assumption :
+        forall (b : BaseCoins) (r : ReserveCoins) (s : StableCoins),
+            b > 0 /\
+            r > 0 /\
+            s > 0.
+
+    
     (*
      * Defining Functions
      *)
@@ -38,54 +47,49 @@ Module Functions.
         state.(exchangeRate).
 
     Definition fusion_ratio 
-        (state : StableCoinState) : QStar :=
+        (state : StableCoinState) : R :=
 
-        let upper_bound_proof := qstar_to_posq_lt_1 (qStar) in
-        let nucleiVal := get_nuclei (state.(reactorState)) in
-        let neutronsVal := get_neutrons (state.(reactorState)) in
+        let baseCoinsVal := get_basecoins (state.(reactorState)) in
+        let stableCoinsVal := get_stablecoins (state.(reactorState)) in
+        let qStarVal := extract_value (qStar) in
         let exchangeRateVal := get_exchange_rate (state) in
-        let qStarPosQ := qstar_to_posq (qStar) in
-        let otherValue := (neutronsVal *p exchangeRateVal) //p nucleiVal in
-        let proof := 
-            a_lt_impl_a_lt_or_b_lt 
-            (qStarPosQ) (otherValue) (1) (upper_bound_proof) in  
-        min_posq (qStarPosQ) (otherValue) (1) (proof).
+        let otherValue := (stableCoinsVal * exchangeRateVal) / baseCoinsVal in 
+        Rmin (qStarVal) (otherValue).
     
-    Definition neutron_price 
-        (state : StableCoinState) : PosQ :=
+    Definition stablecoin_price 
+        (state : StableCoinState) : R :=
 
-        let fusionRatio := qstar_to_posq (fusion_ratio (state)) in
-        let baseCoinsVal := get_nuclei (state.(reactorState)) in
-        let stableCoinsVal := get_neutrons (state.(reactorState)) in
-        (fusionRatio *p baseCoinsVal) //p stableCoinsVal.
+        let fusionRatio := fusion_ratio (state) in
+        let baseCoinsVal := get_basecoins (state.(reactorState)) in
+        let stableCoinsVal := get_stablecoins (state.(reactorState)) in
+        (fusionRatio * baseCoinsVal) / stableCoinsVal.
 
-    Definition proton_price 
-        (state : StableCoinState) : PosQ :=
+    Definition reservecoin_price 
+        (state : StableCoinState) : R :=
 
-        let fusionRatio := qstar_to_posq (fusion_ratio (state)) in
-        let proof := qstar_lt_1 (fusion_ratio (state)) in
-        let baseCoinsVal := get_nuclei (state.(reactorState)) in
-        let reserveCoinsVal := get_protons (state.(reactorState)) in
-        ((sub_posq (one_posq) (fusionRatio) (proof)) *p baseCoinsVal) //p reserveCoinsVal.
+        let fusionRatio := fusion_ratio (state) in
+        let baseCoinsVal := get_basecoins (state.(reactorState)) in
+        let reserveCoinsVal := get_reservecoins (state.(reactorState)) in
+        (1 - fusionRatio) * baseCoinsVal / reserveCoinsVal. 
     
     Definition liabilities 
-        (state : StableCoinState) : Q :=
+        (state : StableCoinState) : R :=
 
-        let fusionRatio := extract_value (fusion_ratio (state)) in
-        let baseCoinsVal := extract_value (get_nuclei (state.(reactorState))) in
+        let fusionRatio := fusion_ratio (state) in
+        let baseCoinsVal := get_basecoins (state.(reactorState)) in
         fusionRatio * baseCoinsVal.
     
     Definition reserve_ratio 
-        (state : StableCoinState) : Q :=
+        (state : StableCoinState) : R :=
 
-        let fusionRatio := extract_value (fusion_ratio (state)) in
+        let fusionRatio := fusion_ratio (state) in
         1 / fusionRatio.
     
     Definition equity 
-        (state : StableCoinState) : Q :=
+        (state : StableCoinState) : R :=
 
-        let fusionRatio := extract_value (fusion_ratio (state)) in
-        let baseCoinsVal := extract_value (get_nuclei (state.(reactorState))) in
+        let fusionRatio := fusion_ratio (state) in
+        let baseCoinsVal := get_basecoins (state.(reactorState)) in
         (1 - fusionRatio) * baseCoinsVal.
     
     (*
@@ -101,8 +105,9 @@ Module Functions.
         filter (
             fun x =>
                 match x with
-                | (_, t, _) => ((lastTimestamp - timePeriod) <=? t) && 
-                            (t <=? lastTimestamp)
+                | (_, t, _) => 
+                    ((lastTimestamp - timePeriod) <=? t)
+                    && (t <=? lastTimestamp)
                 end
         ) reactions.
 
@@ -128,33 +133,33 @@ Module Functions.
     
     Definition volume_beta_pos_reactions 
         (reactions : Trace) 
-        (lastTimestamp : nat) : Q :=
+        (lastTimestamp : nat) : R :=
 
         let betaPosReactions := beta_pos_reactions (reactions) (lastTimestamp) in
         fold_right (fun x acc => match x with
-                                | (stableCoinState, _, BetaDecayPos protons _) =>  
+                                | (stableCoinState, _, BetaDecayPos reserveCoins _) =>  
                                     (acc) + 
-                                    (extract_value (protons) * 
-                                    (extract_value (proton_price (stableCoinState))))
+                                    (reserveCoins * 
+                                    (reservecoin_price (stableCoinState)))
                                 | _ => acc
                                 end) 0 betaPosReactions.
 
     Definition volume_beta_neg_reactions 
         (reactions : Trace) 
-        (lastTimestamp : nat) : Q :=
+        (lastTimestamp : nat) : R :=
 
         let betaNegReactions := beta_neg_reactions (reactions) (lastTimestamp) in
         fold_right (fun x acc => match x with
-                                | (stableCoinState, _, BetaDecayNeg neutrons _) => 
+                                | (stableCoinState, _, BetaDecayNeg stableCoins _) => 
                                     (acc) + 
-                                    (extract_value (neutrons) * 
-                                     extract_value (neutron_price (stableCoinState)))
+                                    (stableCoins * 
+                                    (stablecoin_price (stableCoinState)))
                                 | _ => acc
                                 end) 0 betaNegReactions.
                                 
     Definition net_volume 
         (reactions : Trace) 
-        (lastTimestamp : nat) : Q :=
+        (lastTimestamp : nat) : R :=
 
         let betaPosVolume := 
             volume_beta_pos_reactions (reactions) (lastTimestamp) in
@@ -165,46 +170,44 @@ Module Functions.
     Definition beta_decay_pos_fee  
         (reactions : Trace)
         (stableCoinState : StableCoinState) 
-        (lastTimestamp : nat) : Q :=
+        (lastTimestamp : nat) : R :=
 
         let betaDecayFeePosVal := extract_value (betaDecayFeePos) in
         let betaDecayFeeNegVal := extract_value (betaDecayFeeNeg) in
         let netVolume := net_volume (reactions) (lastTimestamp) in
         let totalBaseCoins := 
-            extract_value (get_nuclei (stableCoinState.(reactorState))) in
+            get_basecoins (stableCoinState.(reactorState)) in
         (betaDecayFeePosVal) +  
         ((betaDecayFeeNegVal) *  
-         ((Qmax (netVolume) (0)) / totalBaseCoins)).
+         ((Rmax (netVolume) (0)) / totalBaseCoins)).
     
     Definition beta_decay_neg_fee 
         (reactions : Trace)
         (stableCoinState : StableCoinState) 
-        (lastTimestamp : nat) : Q :=
+        (lastTimestamp : nat) : R :=
 
         let betaDecayFeePosVal := extract_value (betaDecayFeePos) in
         let betaDecayFeeNegVal := extract_value (betaDecayFeeNeg) in
         let netVolume := net_volume (reactions) (lastTimestamp) in
         let totalBaseCoins := 
-            extract_value (get_nuclei (stableCoinState.(reactorState))) in
+            get_basecoins (stableCoinState.(reactorState)) in
         (betaDecayFeePosVal) +
         ((betaDecayFeeNegVal) * 
-         ((Qmax (netVolume * -1) (0)) / (totalBaseCoins))).
+         ((Rmax (netVolume * -1) (0)) / (totalBaseCoins))).
     
     Definition fission_output 
         (baseCoins : BaseCoins) 
-        (state : StableCoinState) : (StableCoins * ReserveCoins) :=
+        (state : StableCoinState) : (R * R) :=
         let stableCoinsCirculation := 
-            get_neutrons (state.(reactorState)) in
+            get_stablecoins (state.(reactorState)) in
         let reserveCoinsCirculation := 
-            get_protons (state.(reactorState)) in
+            get_reservecoins (state.(reactorState)) in
         let baseCoinsContract := 
-            get_nuclei (state.(reactorState)) in
+            get_basecoins (state.(reactorState)) in
         let stableCoins := 
-            (baseCoins *p (sub_posq (one_posq) (qstar_to_posq (fissionFee)) (qstar_lt_1 (fissionFee)))) *p
-            (stableCoinsCirculation //p baseCoinsContract) in
-        let reserveCoins := 
-            (baseCoins *p (sub_posq (one_posq) (qstar_to_posq (fissionFee)) (qstar_lt_1 (fissionFee)))) *p 
-            (reserveCoinsCirculation //p baseCoinsContract) in
+            (baseCoins * (1 - fusion_ratio (state)) * (1 - extract_value (fissionFee))) / (reservecoin_price (state)) in
+        let reserveCoins :=
+            (baseCoins * fusion_ratio (state) * (1 - extract_value (fissionFee))) / (stablecoin_price (state)) in 
         (stableCoins, reserveCoins).
 
     Definition fission_reaction
@@ -214,39 +217,27 @@ Module Functions.
                                             (stableCoinState) in
         let oldReactorState := stableCoinState.(reactorState) in
         let newReactorState := Build_ReactorState 
-                                (get_nuclei (oldReactorState) +p baseCoins)
-                                (get_neutrons (oldReactorState) +p stableCoins)
-                                (get_protons (oldReactorState) +p reserveCoins) 
+                                (get_basecoins (oldReactorState) + baseCoins)
+                                (get_stablecoins (oldReactorState) + stableCoins)
+                                (get_reservecoins (oldReactorState) + reserveCoins) 
                                 in
         Build_StableCoinState 
             (newReactorState) (stableCoinState.(exchangeRate)).
 
     Definition fusion_output 
-        (stableCoins : Fraction) 
-        (reserveCoins : Fraction) 
-        (state : StableCoinState) : BaseCoins :=
+        (stableCoins : StableCoins) 
+        (reserveCoins : ReserveCoins) 
+        (state : StableCoinState) : R :=
 
         let baseCoinsFromStableCoins := 
-            (fraction_to_posq (stableCoins) *p get_neutrons (state.(reactorState))) *p 
-            (neutron_price (state)) in
+            (stableCoins) * (stablecoin_price (state)) in
         let baseCoinsFromReserveCoins := 
-            (fraction_to_posq (reserveCoins) *p get_protons (state.(reactorState))) *p 
-            (proton_price (state)) in
+            (reserveCoins) * (reservecoin_price (state)) in
         let baseCoinsReturned := 
-            (sub_posq (one_posq) (qstar_to_posq (fusionFee)) (qstar_lt_1 (fusionFee))) *p 
-            (baseCoinsFromReserveCoins +p baseCoinsFromStableCoins) in
+            (1 - extract_value (fusionFee)) * (baseCoinsFromReserveCoins + baseCoinsFromStableCoins) in
         baseCoinsReturned.
     
-    Theorem fusion_returns_portion_of_current_basecoins :
-        forall 
-        (stableCoins : Fraction) 
-        (reserveCoins : Fraction)
-        (state : StableCoinState),
-            extract_value (fusion_output (stableCoins) (reserveCoins) (state)) < extract_value (get_nuclei (state.(reactorState))).
-    Proof.
-        intros.
-        assert (fusion_output (stableCoins) (reserveCoins) (state) < get_nuclei (reactorState (state))) as H.
-    
+
     Definition fusion_reaction
         (stableCoinState : StableCoinState) 
         (stableCoins : StableCoins)
@@ -255,70 +246,55 @@ Module Functions.
                         (stableCoins) (reserveCoins) (stableCoinState) in
         let oldReactorState := stableCoinState.(reactorState) in
         let newReactorState := Build_ReactorState 
-                                (get_nuclei (oldReactorState) - baseCoins)
-                                (get_neutrons (oldReactorState) - stableCoins)
-                                (get_protons (oldReactorState) - reserveCoins) 
+                                (get_basecoins (oldReactorState) - baseCoins)
+                                (get_stablecoins (oldReactorState) - stableCoins)
+                                (get_reservecoins (oldReactorState) - reserveCoins) 
                                 in
         Build_StableCoinState 
             (newReactorState) (stableCoinState.(exchangeRate)).
     
     
     Definition beta_decay_pos_output 
-        (protonsInput : ReserveCoins) 
-        (beta_decay_pos_fee : Q) 
-        (state : StableCoinState) : Q :=
+        (reserveCoins : ReserveCoins) 
+        (beta_decay_pos_fee : R) 
+        (state : StableCoinState) : R :=
 
-        let protonsVal := protonsInput in
-        let fusionRatio := fusion_ratio (state) in
-        let neutronsCirculation := 
-            get_neutrons (state.(reactorState)) in
-        let protonsCirculation := 
-            get_protons (state.(reactorState)) in
-        ((protonsVal * (1 - beta_decay_pos_fee)) *
-        ((1 - fusionRatio) / fusionRatio)) * 
-        (neutronsCirculation / protonsCirculation).
+        (reserveCoins * (1 - beta_decay_pos_fee) * (reservecoin_price (state))) / stablecoin_price (state).
     
     Definition beta_decay_pos_reaction
         (stableCoinState : StableCoinState) 
-        (beta_decay_pos_fee : Q)
+        (beta_decay_pos_fee : R)
         (protonsInput : ReserveCoins) : StableCoinState :=
         let neutrons := beta_decay_pos_output
                         (protonsInput) (beta_decay_pos_fee) (stableCoinState) in
         let oldReactorState := stableCoinState.(reactorState) in
         let newReactorState := Build_ReactorState 
-                                (get_nuclei (oldReactorState))
-                                (get_neutrons (oldReactorState) + neutrons)
-                                (get_protons (oldReactorState) - protonsInput) 
+                                (get_basecoins (oldReactorState))
+                                (get_stablecoins (oldReactorState) + neutrons)
+                                (get_reservecoins (oldReactorState) - protonsInput) 
                                 in
         Build_StableCoinState 
             (newReactorState) (stableCoinState.(exchangeRate)).
 
     Definition beta_decay_neg_output 
-        (neutronsInput : StableCoins) 
-        (beta_decay_neg_fee : Q) 
-        (state : StableCoinState) : Q :=
+        (stableCoins : StableCoins) 
+        (beta_decay_neg_fee : R) 
+        (state : StableCoinState) : R :=
 
-        let neutronsVal := neutronsInput in
-        let fusionRatio := fusion_ratio (state) in
-        let neutronsCirculation := 
-            get_neutrons (state.(reactorState)) in
-        let protonsCirculation := 
-            get_protons (state.(reactorState)) in 
-        ((neutronsVal * (1 - beta_decay_neg_fee))) * 
-        (fusionRatio / (1 - fusionRatio)) * 
-        (protonsCirculation / neutronsCirculation).
+        (stableCoins * (1 - beta_decay_neg_fee) * (stablecoin_price (state))) / reservecoin_price (state).
+        
     
     Definition beta_decay_neg_reaction
         (stableCoinState : StableCoinState) 
-        (beta_decay_neg_fee : Q)
+        (beta_decay_neg_fee : R)
         (neutronsInput : StableCoins) : StableCoinState :=
         let protons := beta_decay_neg_output
                         (neutronsInput) (beta_decay_neg_fee) (stableCoinState) in
         let oldReactorState := stableCoinState.(reactorState) in
         let newReactorState := Build_ReactorState 
-                                (get_nuclei (oldReactorState))
-                                (get_neutrons (oldReactorState) - neutronsInput)
-                                (get_protons (oldReactorState) + protons) 
+                                (get_basecoins (oldReactorState))
+                                (get_stablecoins (oldReactorState) - neutronsInput)
+                                (get_reservecoins (oldReactorState) + protons) 
                                 in
         Build_StableCoinState 
             (newReactorState) (stableCoinState.(exchangeRate)).
@@ -335,24 +311,24 @@ Module Functions.
         (timestamp : nat)
         (state_0 : State) 
         (state_1 : State)
-        (action : Action) : Q :=
+        (action : Action) : R :=
         match action with
         | SellStableCoin => 0
         | BuyStableCoin =>
-            let proton_price_0 := proton_price (state_0.(stableCoinState)) in
-            let neutron_price_0 := neutron_price (state_0.(stableCoinState)) in
-            let proton_price_1 := proton_price (state_1.(stableCoinState)) in
-            let neutron_price_1 := neutron_price (state_1.(stableCoinState)) in
+            let reservecoin_price_0 := reservecoin_price (state_0.(stableCoinState)) in
+            let stablecoin_price_0 := stablecoin_price (state_0.(stableCoinState)) in
+            let reservecoin_price_1 := reservecoin_price (state_1.(stableCoinState)) in
+            let stablecoin_price_1 := stablecoin_price (state_1.(stableCoinState)) in
             let fusion_ratio_0 := fusion_ratio (state_0.(stableCoinState)) in
             let fission_fee_val := extract_value (fissionFee) in
             let beta_decay_pos_fee_val := 
                 beta_decay_pos_fee (state_1.(reactions)) 
                 (state_1.(stableCoinState)) (timestamp) in
-            ((proton_price_0 * neutron_price_1) / 
+            ((reservecoin_price_0 * stablecoin_price_1) / 
             ((fusion_ratio_0 * (1 - fission_fee_val) * 
-                proton_price_0 * neutron_price_1) + 
+                reservecoin_price_0 * stablecoin_price_1) + 
             ((1 - fusion_ratio_0) * (1 - fission_fee_val) * 
-            (1 - beta_decay_pos_fee_val) * proton_price_1 * neutron_price_0))) 
+            (1 - beta_decay_pos_fee_val) * reservecoin_price_1 * stablecoin_price_0))) 
             - 1
         end.
     
@@ -364,16 +340,16 @@ Module Functions.
         (timestamp : nat)
         (state_0 : State) 
         (state_1 : State) 
-        (action : Action) : Q :=
+        (action : Action) : R :=
         match action with
         | BuyStableCoin => 
             (1 + get_effective_fee 
                 (timestamp) (state_0) (state_1) (action)) *
-            (neutron_price (state_0.(stableCoinState)))
+            (stablecoin_price (state_0.(stableCoinState)))
         | SellStableCoin =>  
             (1 + get_effective_fee 
                 (timestamp) (state_0) (state_1) (action)) *
-            (neutron_price (state_0.(stableCoinState)))
+            (stablecoin_price (state_0.(stableCoinState)))
         end.
 
 
@@ -386,19 +362,17 @@ Module Functions.
      *)
     Definition get_rational_choice 
         (action : Action) 
-        (primaryMarketOffer : Q) 
-        (secondaryMarketOffer : Q) : Choice :=
+        (primaryMarketOffer : R) 
+        (secondaryMarketOffer : R) : Choice :=
         match action with
         | BuyStableCoin =>
-            match secondaryMarketOffer ?= primaryMarketOffer with
-            | Lt => Secondary
-            | _ => Primary
-            end
+            if Rlt_dec secondaryMarketOffer primaryMarketOffer
+            then Secondary
+            else Primary
         | SellStableCoin =>
-            match secondaryMarketOffer ?= primaryMarketOffer with
-            | Gt => Secondary
-            | _ => Primary
-            end
+            if Rgt_dec secondaryMarketOffer primaryMarketOffer
+            then Secondary
+            else Primary
         end.
     
     (*

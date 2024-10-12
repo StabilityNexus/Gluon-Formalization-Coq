@@ -1,64 +1,49 @@
 From StableCoinFormalization Require Export Datatypes.
 From StableCoinFormalization Require Export HelperFunctions.
 From StableCoinFormalization Require Export Functions.
-From StableCoinFormalization Require Export HelperLemmas.
-Require Export Lqa.
-Require Export Lia.
-
+Require Export Lra.
+Local Open Scope R_scope.
 Module Theorem1.
     Import Datatypes.
     Import HelperFunctions.
-    Import HelperLemmas.
     Import Functions.
-    Import Qminmax.
-    Import QArith.
-    Import Lqa.
-    Import Lia.
+    Import Lra.
 
     Lemma actual_price_le_target_price_neutron :
         forall 
             (stableCoinState : StableCoinState),
-            neutron_price (stableCoinState) <= target_price (stableCoinState).
+            stablecoin_price (stableCoinState) <= target_price (stableCoinState).
         
         Proof.
-            intros stableCoinState. 
-            destruct stableCoinState as [reactorState exchangeRate].
-            destruct reactorState as [nuclei neutrons protons].
-            destruct nuclei as [nu Hnu]. destruct neutrons as [n Hn]. 
-            destruct protons as [p Hp]. destruct exchangeRate as [ex Hex].
-            unfold neutron_price. unfold fusion_ratio. unfold target_price. 
-            simpl. destruct qStar as [qs Hqs]. simpl. 
-            destruct (Q.min_spec (qs) (n * ex / nu)) as [] eqn:E. 
-            - destruct a as [H1 H2]. rewrite H2. unfold Qdiv.
-            apply Qmult_lt_compat_r with (z:=nu) in H1 as H3.
-            unfold Qdiv in H3.
-            rewrite <- Qmult_assoc in H3.
-            assert (/nu * nu == nu * / nu) as H4.
-            { apply Qmult_comm. }
-            rewrite H4 in H3. rewrite Qmult_inv_r in H3. 
-            rewrite Qmult_1_r in H3.
-            apply Qmult_lt_compat_r with (z:=/n) in H3.
-            rewrite <- Qmult_assoc in H3.
-            rewrite <- Qmult_assoc in H3.
-            assert (ex * /n == /n * ex ) as H5.
-            { apply Qmult_comm. }
-            rewrite H5 in H3. rewrite Qmult_assoc in H3.
-            rewrite Qmult_assoc in H3. rewrite Qmult_inv_r in H3.
-            rewrite Qmult_1_l in H3. apply Qlt_le_weak. apply H3.
-            apply Qnot_eq_sym. apply Qlt_not_eq. apply Hn. 
-            apply Qinv_lt_0_compat. apply Hn.
-            apply Qnot_eq_sym. apply Qlt_not_eq. apply Hnu.
-            apply Hnu.
-            - destruct a as [H1 H2]. rewrite H2. unfold Qdiv.
-            simpl. rewrite <- Qmult_assoc with (m:=/nu). 
-            rewrite Qmult_comm with (x:=/nu). rewrite Qmult_inv_r.
-            rewrite <- Qmult_assoc. rewrite Qmult_1_l. rewrite <- Qmult_assoc.
-            rewrite <- Qmult_comm. rewrite <- Qmult_assoc.
-            assert (/ n * n == n * / n).
-            { rewrite Qmult_comm. reflexivity. }
-            rewrite H. rewrite Qmult_inv_r. rewrite Qmult_1_r. apply Qle_refl.
-            apply Qnot_eq_sym. apply Qlt_not_eq. apply Hn.
-            apply Qnot_eq_sym. apply Qlt_not_eq. apply Hnu.
+            intros stableCoinState.
+            destruct stableCoinState as [reactorState ex].
+            destruct reactorState as [b s r].
+            unfold stablecoin_price. unfold fusion_ratio. unfold target_price. 
+            destruct qStar as [qs Hqs]. unfold Rmin. simpl.
+            assert (b > 0 /\ r > 0 /\ s > 0) as H2.
+            { apply reactorstate_assumption. }
+            destruct H2 as [H2 [H3 H4]]. 
+            destruct (Rle_dec qs (s * ex / b)).
+            - apply Rmult_le_compat_r with (r := b) in r0 as H1.
+            unfold Rdiv in H1. rewrite Rmult_assoc in H1. rewrite Rinv_l in H1.
+            rewrite Rmult_1_r in H1.
+            apply Rmult_le_compat_r with (r := / s) in H1.
+            unfold Rdiv in H1. rewrite Rmult_assoc in H1. 
+            rewrite Rmult_assoc in H1. assert (ex * / s = /s * ex).
+            { rewrite Rmult_comm. reflexivity. } rewrite H in H1.
+            rewrite <- Rmult_assoc in H1. rewrite <- Rmult_assoc in H1.
+            rewrite Rinv_r in H1. rewrite Rmult_1_l in H1. apply H1.
+            * nra.
+            * apply Rlt_le. apply Rinv_0_lt_compat. apply H4.
+            * nra.
+            * apply Rlt_le. apply H2.
+            - unfold Rdiv. rewrite Rmult_assoc with (r1 := s * ex).
+            rewrite Rinv_l. rewrite Rmult_1_r. 
+            rewrite Rmult_comm with (r1 := s * ex). rewrite <- Rmult_assoc.
+            rewrite Rinv_l. rewrite Rmult_1_l.
+            * nra.
+            * nra.
+            * nra.
         Qed.
 
     (*
@@ -78,34 +63,34 @@ Module Theorem1.
             (state_0 : State)
             (state_1 : State) 
             (offer : Offer),
+            is_valid_state (state_0) /\ is_valid_state (state_1) /\
             (1 / extract_value (qStar)) < 
             (reserve_ratio (state_0.(stableCoinState))) /\
             offer.(action) = SellStableCoin /\
             ((1 + get_effective_fee (timestamp) (state_0) (state_1) (BuyStableCoin)) * 
             target_price (state_0.(stableCoinState))) < 
-            (extract_value (offer.(value))) /\
+            (offer.(value)) /\
             (get_effective_fee (timestamp) (state_0) (state_1) (BuyStableCoin) >= 0)
             ->
             (get_rational_choice (BuyStableCoin) 
             (get_primary_market_offer (timestamp) (state_0) (state_1) (BuyStableCoin)) 
-            (extract_value (offer.(value))) = Secondary -> False) /\
-            get_effective_fee (timestamp) (state_0) (state_1) (BuyStableCoin) <=
-            (1 / ((1 - extract_value (fissionFee)) * (1 - beta_decay_pos_fee (state_1) (timestamp)))) *
-            (reserve_ratio (state_0.(stableCoinState)) / ((reserve_ratio (state_1.(stableCoinState))) - 1)) - 1.
+            (offer.(value)) = Secondary -> False).
     
     Proof.
-        intros. split.
-        - intros. destruct H as [H1 [H2 [H3 H4]]]. rewrite Qmult_comm in H3.
-          apply Qle_lt_trans with 
-          (x:= (1 + get_effective_fee timestamp state_0 state_1 BuyStableCoin) * 
-          neutron_price (state_0.(stableCoinState))) in H3.
-          simpl in H0. rewrite Qgt_alt in H3. simpl in H3. rewrite H3 in H0. 
-          discriminate H0. rewrite Qmult_comm. apply Qmult_le_compat_r.
-          * apply actual_price_le_target_price_neutron.
-          * apply nonnegative_plus_nonnegative.
-            + unfold Qle. simpl. lia.
-            + apply H4.
-        - destruct H as [H1 [H2 [H3 H4]]]. simpl. 
+        intros. destruct H as [H1 [H2 [H3 [H4 [H5 H6]]]]]. 
+        unfold get_primary_market_offer in H0.
+        assert ((1 + get_effective_fee timestamp state_0 state_1 BuyStableCoin) * stablecoin_price (stableCoinState state_0) < value offer) as H7.
+        { 
+            apply Rle_lt_trans with (r2 := (1 + get_effective_fee timestamp state_0 state_1 BuyStableCoin) * target_price (stableCoinState state_0)). 
+            apply Rmult_le_compat_l.
+            apply Rplus_le_le_0_compat.
+            - nra.
+            - nra.
+            - apply actual_price_le_target_price_neutron.
+            - apply H5.
+        } unfold get_rational_choice in H0. destruct Rlt_dec in H0.
+        - nra.
+        - discriminate H0.
     Qed.
     
 End Theorem1.

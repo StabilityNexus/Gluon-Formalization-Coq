@@ -1,9 +1,5 @@
-From StableCoinFormalization Require Export Datatypes.
-From StableCoinFormalization Require Export HelperFunctions.
-From StableCoinFormalization Require Export Functions.
+Require Export QArith.
 Require Export Lqa.
-
-
 Lemma nonnegative_plus_nonnegative : 
     forall a b : Q,
         0 <= a -> 0 <= b -> 0 <= a + b.

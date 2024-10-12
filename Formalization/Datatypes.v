@@ -1,61 +1,59 @@
 (*
  * Importing the Libraries
  *)
-Require Export QArith.
-Require Export Qminmax.
 Require Export List.
-Require Export Lqa.
-Require Export Lia.
+Require Export Reals.
 From StableCoinFormalization Require Export HelperFunctions.
 
 Module Datatypes.
-    Import HelperFunctions.
-    Import Lqa.
-    Import Lia.
+    Import HelperFunctions. 
+    Import Reals.
 
-    Definition PosQ : Type := {x : Q | 0 < x}.
-    Definition NonNegQ : Type := {x : Q | 0 <= x}.
-    Definition Fraction : Type := {x : Q | 0 < x <= 1}.
+    Local Open Scope R_scope.
 
-    Definition StableCoins : Type := PosQ.
-    Definition ReserveCoins : Type := PosQ.
-    Definition BaseCoins : Type := PosQ.
-    Definition ExchangeRate : Type := PosQ.
+    Definition PosR : Type := {x : R | 0 < x}.
+    Definition NonNegR : Type := {x : R | 0 <= x}.
+    Definition FractionR : Type := {x : R | 0 < x <= 1}.
+
+    Definition StableCoins : Type := R.
+    Definition ReserveCoins : Type := R.
+    Definition BaseCoins : Type := R.
+    Definition ExchangeRate : Type := R.
     
-    Definition QStar : Type := {x : Q | 0 < x < 1}.
-    Definition FissionFee : Type := {x : Q | 0 < x < 1}.
-    Definition FusionFee : Type := {x : Q | 0 < x < 1}.
+    Definition QStar : Type := {x : R | 0 < x < 1}.
+    Definition FissionFee : Type := {x : R | 0 < x < 1}.
+    Definition FusionFee : Type := {x : R | 0 < x < 1}.
     (*
      * + Beta Decay = transmute to neutron
      * - Beta Decay = transmute to proton
      *)
-    Definition BetaDecayFeePos : Type := {x : Q | 0 < x}.
-    Definition BetaDecayFeeNeg : Type := {x : Q | 0 < x}.
+    Definition BetaDecayFeePos : Type := {x : R | 0 < x}.
+    Definition BetaDecayFeeNeg : Type := {x : R | 0 < x}.
     Definition TimePeriod : Type := nat.
     Definition Timestamp : Type := nat.
     
     
     Record ReactorState :=
     {
-        nuclei : BaseCoins;
-        neutrons : StableCoins;
-        protons : ReserveCoins;
+        baseCoins : BaseCoins;
+        stableCoins : StableCoins;
+        reserveCoins : ReserveCoins;
     }.
 
-    Definition get_nuclei (reactorState : ReactorState) : BaseCoins :=
-        reactorState.(nuclei).
+    Definition get_basecoins (reactorState : ReactorState) : R :=
+        reactorState.(baseCoins).
     
-    Definition get_neutrons (reactorState : ReactorState) : StableCoins :=
-        reactorState.(neutrons).
+    Definition get_stablecoins (reactorState : ReactorState) : R :=
+        reactorState.(stableCoins).
     
-    Definition get_protons (reactorState : ReactorState) : ReserveCoins :=
-        reactorState.(protons).
+    Definition get_reservecoins (reactorState : ReactorState) : R :=
+        reactorState.(reserveCoins).
 
     Inductive Reaction : Type :=
-    | Fission (nuclei : BaseCoins) (neutrons : StableCoins) (protons : ReserveCoins)
-    | Fusion (neutrons : Fraction) (protons : Fraction) (nuclei : BaseCoins)
-    | BetaDecayPos (protons : Fraction) (neutrons : StableCoins)
-    | BetaDecayNeg (neutrons : Fraction) (protons : ReserveCoins).
+    | Fission (baseCoins : BaseCoins) (stableCoins : StableCoins) (reserveCoins : ReserveCoins)
+    | Fusion (stableCoins : StableCoins) (reserveCoins : ReserveCoins) (baseCoins : BaseCoins)
+    | BetaDecayPos (reserveCoins : ReserveCoins) (stableCoins : StableCoins)
+    | BetaDecayNeg (stableCoins : StableCoins) (reserveCoins : ReserveCoins).
 
     Record StableCoinState :=
     {
@@ -64,7 +62,7 @@ Module Datatypes.
     }.
 
     Definition get_exchange_rate 
-    (stableCoinState : StableCoinState) : ExchangeRate :=
+    (stableCoinState : StableCoinState) : R :=
         stableCoinState.(exchangeRate).
 
     (*
@@ -101,7 +99,7 @@ Module Datatypes.
         value : BaseCoins;
     }.
 
-    Definition one_posq : PosQ.
+    (* Definition one_posq : PosQ.
     Proof.
         exists (1 # 1).
         unfold Qlt. simpl. lia.
@@ -256,7 +254,7 @@ Module Datatypes.
     Notation "a +p b" := (add_posq a b) (at level 50, left associativity).
 
     (* Inverse operator (unary operator for inverse) *)
-    Notation "'/p' a" := (inv_posq a) (at level 35, right associativity).
+    Notation "'/p' a" := (inv_posq a) (at level 35, right associativity). *)
 End Datatypes.
 
 
