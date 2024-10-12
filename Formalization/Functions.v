@@ -245,7 +245,7 @@ Module Functions.
             extract_value (fusion_output (stableCoins) (reserveCoins) (state)) < extract_value (get_nuclei (state.(reactorState))).
     Proof.
         intros.
-
+        assert (fusion_output (stableCoins) (reserveCoins) (state) < get_nuclei (reactorState (state))) as H.
     
     Definition fusion_reaction
         (stableCoinState : StableCoinState) 
@@ -486,7 +486,8 @@ Module Functions.
             end.
 
 
-    (*
+    (* (s1, t1, r1) , (s2, t2, r2)
+    
      * This returns the proposition that a state is valid
      * Conditions to check:
      * 1. The stablecoin state after executing a reaction is the same as the 
