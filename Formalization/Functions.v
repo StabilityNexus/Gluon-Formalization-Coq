@@ -302,6 +302,44 @@ Module Functions.
     (*
      * Theorem related functions
      *)
+    
+    Definition stablecoins_from_m_basecoins
+        (state_0 : State)
+        (timestamp : nat)
+        (state_1 : State)
+        (basecoins : R) 
+        (fracProtonsDecay : R) : R :=
+    let (stablecoins, reservecoins) := fission_output (basecoins) (state_0.(stableCoinState)) in
+    let betaDecayFeePos := beta_decay_pos_fee (state_1.(reactions)) (state_1.(stableCoinState)) (timestamp) in
+    let stablecoinsFromDecay := beta_decay_pos_output (reservecoins * fracProtonsDecay) (betaDecayFeePos) (state_1.(stableCoinState)) in
+    stablecoins + stablecoinsFromDecay.
+    
+    (*
+     * This functions gives us the number of base coins we have to use for 
+     * fission in order to get N stablecoins.
+     * state_0: stablecoin state before fission
+     * timestamp: time when the beta decay + is initiated
+     * state_1: stablecoin state before beta decay +
+     * fracProtonsDecay: fraction of reserve coins from fission that are 
+     *                   converted to stablecoins
+     *)
+
+    Definition base_coins_for_n_stable_coins
+        (state_0 : State)
+        (timestamp : nat)
+        (state_1 : State)
+        (stablecoinsRequired : R) 
+        (fracProtonsDecay : R) : R :=
+        let rInit := reservecoin_price (state_0.(stableCoinState)) in
+        let rNew := reservecoin_price (state_1.(stableCoinState)) in
+        let sInit := stablecoin_price (state_0.(stableCoinState)) in
+        let sNew := stablecoin_price (state_1.(stableCoinState)) in
+        let fInit := fusion_ratio (state_0.(stableCoinState)) in
+        let betaPlusInit := beta_decay_pos_fee (state_1.(reactions)) (state_1.(stableCoinState)) (timestamp) in
+        let fissionFeeVal := extract_value (fissionFee) in
+        (rInit * sNew * sInit * stablecoinsRequired) / 
+        ((fInit * (1 - fissionFeeVal) * rInit * sNew) + 
+        ((1 - fInit) * fracProtonsDecay * (1 - fissionFeeVal) * (1 - betaPlusInit) * rNew * sInit)).
 
     (*
      * This function returns the effective fee in terms of base coins for the
@@ -315,21 +353,9 @@ Module Functions.
         match action with
         | SellStableCoin => 0
         | BuyStableCoin =>
-            let reservecoin_price_0 := reservecoin_price (state_0.(stableCoinState)) in
-            let stablecoin_price_0 := stablecoin_price (state_0.(stableCoinState)) in
-            let reservecoin_price_1 := reservecoin_price (state_1.(stableCoinState)) in
-            let stablecoin_price_1 := stablecoin_price (state_1.(stableCoinState)) in
-            let fusion_ratio_0 := fusion_ratio (state_0.(stableCoinState)) in
-            let fission_fee_val := extract_value (fissionFee) in
-            let beta_decay_pos_fee_val := 
-                beta_decay_pos_fee (state_1.(reactions)) 
-                (state_1.(stableCoinState)) (timestamp) in
-            ((reservecoin_price_0 * stablecoin_price_1) / 
-            ((fusion_ratio_0 * (1 - fission_fee_val) * 
-                reservecoin_price_0 * stablecoin_price_1) + 
-            ((1 - fusion_ratio_0) * (1 - fission_fee_val) * 
-            (1 - beta_decay_pos_fee_val) * reservecoin_price_1 * stablecoin_price_0))) 
-            - 1
+            let baseCoinsForOneStableCoin := base_coins_for_n_stable_coins (state_0) (timestamp) (state_1) (1) (1) in
+            let stableCoinPriceBeforeFission := stablecoin_price (state_0.(stableCoinState)) in
+            (baseCoinsForOneStableCoin / stableCoinPriceBeforeFission) - 1
         end.
     
     (*
@@ -343,9 +369,7 @@ Module Functions.
         (action : Action) : R :=
         match action with
         | BuyStableCoin => 
-            (1 + get_effective_fee 
-                (timestamp) (state_0) (state_1) (action)) *
-            (stablecoin_price (state_0.(stableCoinState)))
+            base_coins_for_n_stable_coins (state_0) (timestamp) (state_1) (1) (1)
         | SellStableCoin =>  
             (1 + get_effective_fee 
                 (timestamp) (state_0) (state_1) (action)) *

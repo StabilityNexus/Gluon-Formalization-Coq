@@ -13,7 +13,7 @@ Module Datatypes.
 
     Definition PosR : Type := {x : R | 0 < x}.
     Definition NonNegR : Type := {x : R | 0 <= x}.
-    Definition FractionR : Type := {x : R | 0 < x <= 1}.
+    Definition FractionR : Type := {x : R | 0 <= x <= 1}.
 
     Definition StableCoins : Type := R.
     Definition ReserveCoins : Type := R.

@@ -70,16 +70,30 @@ Module Theorem1.
             ((1 + get_effective_fee (timestamp) (state_0) (state_1) (BuyStableCoin)) * 
             target_price (state_0.(stableCoinState))) < 
             (offer.(value)) /\
-            (get_effective_fee (timestamp) (state_0) (state_1) (BuyStableCoin) >= 0)
+            (get_effective_fee (timestamp) (state_0) (state_1) (BuyStableCoin) >= 0) /\
+            stablecoin_price (state_0.(stableCoinState)) <> 0
             ->
             (get_rational_choice (BuyStableCoin) 
             (get_primary_market_offer (timestamp) (state_0) (state_1) (BuyStableCoin)) 
-            (offer.(value)) = Secondary -> False).
+            (offer.(value)) = Secondary -> False) /\
+            get_effective_fee (timestamp) (state_0) (state_1) (BuyStableCoin) = 
+            ((reservecoin_price (state_0.(stableCoinState)) 
+            * stablecoin_price (state_1.(stableCoinState))) / 
+            ((fusion_ratio (state_0.(stableCoinState)) 
+            * (1 - extract_value (fissionFee)) 
+            * (reservecoin_price (state_0.(stableCoinState))) 
+            * (stablecoin_price (state_1.(stableCoinState)))) + 
+            ((1 - fusion_ratio (state_0.(stableCoinState))) 
+            * (1 - extract_value (fissionFee)) 
+            * (1 - beta_decay_pos_fee (state_1.(reactions)) (state_1.(stableCoinState)) (timestamp)) 
+            * (reservecoin_price (state_1.(stableCoinState))) 
+            * (stablecoin_price (state_0.(stableCoinState)))))) - 1.
     
     Proof.
-        intros. destruct H as [H1 [H2 [H3 [H4 [H5 H6]]]]]. 
+        intros. split.
+        - intros. destruct H as [H1 [H2 [H3 [H4 [H5 [H6 H7]]]]]]. 
         unfold get_primary_market_offer in H0.
-        assert ((1 + get_effective_fee timestamp state_0 state_1 BuyStableCoin) * stablecoin_price (stableCoinState state_0) < value offer) as H7.
+        assert ((1 + get_effective_fee timestamp state_0 state_1 BuyStableCoin) * stablecoin_price (stableCoinState state_0) < value offer) as H8.
         { 
             apply Rle_lt_trans with (r2 := (1 + get_effective_fee timestamp state_0 state_1 BuyStableCoin) * target_price (stableCoinState state_0)). 
             apply Rmult_le_compat_l.
@@ -88,9 +102,21 @@ Module Theorem1.
             - nra.
             - apply actual_price_le_target_price_neutron.
             - apply H5.
-        } unfold get_rational_choice in H0. destruct Rlt_dec in H0.
-        - nra.
-        - discriminate H0.
+        } unfold get_rational_choice in H0. destruct Rlt_dec in H0. 
+        * unfold get_effective_fee in H8. rewrite Rplus_comm with (r1 := 1) in H8.
+        rewrite Rminus_def in H8.
+        rewrite Rplus_assoc with (r2 := -1) in H8.
+        assert (-1 + 1 = 0) as H9.
+        { apply Rplus_opp_l. } rewrite H9 in H8. rewrite Rplus_0_r in H8.
+        unfold Rdiv in H8. rewrite Rmult_assoc in H8. rewrite Rinv_l in H8. nra.
+        apply H7.
+        * discriminate H0.
+        - unfold get_effective_fee. unfold base_coins_for_n_stable_coins.
+        simpl. rewrite Rmult_1_r. rewrite Rmult_1_r.
+        rewrite Rmult_div_swap with (r2 := stablecoin_price (stableCoinState state_0)).  
+        rewrite Rmult_div_l with (r2 := stablecoin_price (stableCoinState state_0)).
+        reflexivity. destruct H as [H1 [H2 [H3 [H4 [H5 [H6 H7]]]]]].
+        apply H7.
     Qed.
     
 End Theorem1.
