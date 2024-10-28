@@ -1,5 +1,6 @@
 Require Export QArith.
 Require Export Lqa.
+Require Export Reals.
 Lemma nonnegative_plus_nonnegative : 
     forall a b : Q,
         0 <= a -> 0 <= b -> 0 <= a + b.
@@ -34,6 +35,6 @@ Proof.
         * apply Qlt_le_weak. apply Qinv_lt_0_compat. lra.
         * lra.
         * apply Qlt_le_weak. apply Qinv_lt_0_compat. lra.
-    Qed. 
+    Qed.
 
     
