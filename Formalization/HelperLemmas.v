@@ -1,40 +1,25 @@
-Require Export QArith.
-Require Export Lqa.
 Require Export Reals.
-Lemma nonnegative_plus_nonnegative : 
-    forall a b : Q,
-        0 <= a -> 0 <= b -> 0 <= a + b.
-Proof.
-    intros a b Ha Hb.
-    apply Qplus_le_compat with (x:=0) (z:=0) (y:=a) (t:=b). 
-    - apply Ha.
-    - apply Hb.
-Qed.
+Local Open Scope R_scope.
 
-
-
-Lemma denominator_small_implies_fraction_big :
-    forall a b c : Q,
-        0 <= a -> 0 <= b -> 0 < c -> a / (b + c) <= a / c.
-Proof.
-    intros.
-    assert (H2: a * c <= a * (b + c)).
-    - nra.
-    - apply Qmult_le_compat_r with (z:=(/c)) in H2. 
-    rewrite <- Qmult_assoc in H2. rewrite Qmult_inv_r in H2. 
-    rewrite Qmult_1_r in H2.
-    apply Qmult_le_compat_r with (z:=(/(b + c))) in H2. 
-    rewrite <- Qmult_assoc in H2.
-    assert (/ c * /(b + c) == /(b + c) * /c) as H3.
-    { lra. } rewrite H3 in H2. rewrite <- Qmult_assoc in H2.
-    assert ((b + c) * (/ (b + c) * / c) == (b + c) * / (b + c) * /c).
-    { lra. } rewrite H4 in H2. rewrite Qmult_inv_r in H2.
-    rewrite Qmult_1_l in H2.
-        * unfold Qdiv. apply H2.
-        * lra.
-        * apply Qlt_le_weak. apply Qinv_lt_0_compat. lra.
-        * lra.
-        * apply Qlt_le_weak. apply Qinv_lt_0_compat. lra.
+Module HelperLemmas.
+    Lemma add_frac_real :
+        forall a b c d : R, b <> 0 -> d <> 0 ->
+            (a / b) + (c / d) = ((a * d) + (c * b)) / (b * d).
+    Proof.
+        intros a b c d Hb_nonzero Hd_nonzero. unfold Rdiv.
+        rewrite Rmult_comm with (r1 := (a * d + c * b)).
+        rewrite Rmult_plus_distr_l with (r1 := / (b * d)).
+        rewrite Rmult_comm with (r1 := / (b * d)).
+        rewrite Rmult_comm with (r1 := / (b * d)).
+        assert (forall a b : R, a * /b = a / b) as H.
+        { intros. unfold Rdiv. reflexivity. }
+        rewrite H with (a := (a * d)) (b := (b * d)).
+        rewrite H with (a := (c * b)) (b := (b * d)).
+        rewrite Rdiv_mult_r_r with (r := d).
+        rewrite Rmult_comm with (r1 := b).
+        rewrite Rdiv_mult_r_r with (r := b).
+        - rewrite H. rewrite H. reflexivity.
+        - apply Hb_nonzero.
+        - apply Hd_nonzero.
     Qed.
-
-    
+End HelperLemmas.
