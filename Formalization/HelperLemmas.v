@@ -1,7 +1,9 @@
 Require Export Reals.
+Require Export Lra.
 Local Open Scope R_scope.
 
 Module HelperLemmas.
+    Import Lra.
     Lemma add_frac_real :
         forall a b c d : R, b <> 0 -> d <> 0 ->
             (a / b) + (c / d) = ((a * d) + (c * b)) / (b * d).
@@ -21,5 +23,24 @@ Module HelperLemmas.
         - rewrite H. rewrite H. reflexivity.
         - apply Hb_nonzero.
         - apply Hd_nonzero.
+    Qed.
+
+    Lemma a_lt_c_strict : 
+        forall a b c : R, 0 < a -> 0 < b -> a + b <= c -> a < c.
+    Proof.
+        intros a b c Ha Hb Hsum.
+        (* We know a + b <= c and 0 < b, so a must be strictly less than c *)
+        apply Rlt_le_trans with (r2 := a + b).
+        - nra.
+        - apply Hsum. 
+    Qed.
+
+    Lemma abs_lt_implies_lt : forall a b : R, Rabs a < b -> a < b.
+    Proof.
+        intros a b HRabs.
+        unfold Rabs in HRabs.
+        destruct (Rcase_abs a) as [H_neg | H_nonneg].
+        - nra.
+        - nra.
     Qed.
 End HelperLemmas.

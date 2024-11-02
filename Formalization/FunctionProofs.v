@@ -82,19 +82,10 @@ Module FunctionProofs.
         - nra.
     Qed. 
 
-    Lemma a_lt_c_strict : 
-        forall a b c : R, 0 < a -> 0 < b -> a + b <= c -> a < c.
-    Proof.
-        intros a b c Ha Hb Hsum.
-        (* We know a + b <= c and 0 < b, so a must be strictly less than c *)
-        apply Rlt_le_trans with (r2 := a + b).
-        - nra.
-        - apply Hsum. 
-    Qed.
 
     Lemma net_volume_lt_basecoins :
         forall (state : State) (timestamp : nat),
-            net_volume (state.(reactions)) (timestamp) < ((state.(stableCoinState)).(reactorState)).(baseCoins).
+            Rabs (net_volume (state.(reactions)) (timestamp)) < ((state.(stableCoinState)).(reactorState)).(baseCoins).
     Proof.
     Admitted.
 
@@ -104,7 +95,7 @@ Module FunctionProofs.
             beta_decay_pos_fee (reactions (state)) (stableCoinState (state)) (timestamp) < 1.
     Proof.
         intros. assert (net_volume (state.(reactions)) (timestamp) < ((state.(stableCoinState)).(reactorState)).(baseCoins)) as H.
-        { apply net_volume_lt_basecoins. }
+        { apply abs_lt_implies_lt. apply net_volume_lt_basecoins. }
         destruct state. destruct stableCoinState0. destruct reactorState0.
         unfold beta_decay_pos_fee. simpl. simpl in H. unfold Rmax. destruct (Rle_dec (net_volume reactions0 timestamp) 0).
         - unfold Rdiv. rewrite Rmult_0_l. rewrite Rmult_0_r. rewrite Rplus_0_r.
