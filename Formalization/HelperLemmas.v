@@ -43,4 +43,22 @@ Module HelperLemmas.
         - nra.
         - nra.
     Qed.
+
+    Lemma rmin_ab_lt_a_imp_b :
+        forall (r1 r2 : R),
+            Rmin (r1) (r2) < r1 -> Rmin (r1) (r2) = r2. 
+    Proof.
+        intros. unfold Rmin. unfold Rmin in H. destruct Rle_dec. 
+        - nra.
+        - reflexivity.
+    Qed.
+
+    Lemma a_div_b_c_imp_a_mult_c_div_b :
+        forall (a b c : R),
+            a / (b / c) = (a * c) / b.
+    Proof.
+        intros. unfold Rdiv. rewrite Rmult_comm with (r1 := b).
+        rewrite Rinv_mult. rewrite Rinv_inv. rewrite Rmult_assoc.
+        reflexivity. 
+    Qed.
 End HelperLemmas.

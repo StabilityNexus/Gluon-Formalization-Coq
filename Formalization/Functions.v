@@ -501,8 +501,8 @@ Module Functions.
             end.
 
 
-    (* (s1, t1, r1) , (s2, t2, r2)
-    
+    (* 
+     * (s1, t1, r1) , (s2, t2, r2)
      * This returns the proposition that a state is valid
      * Conditions to check:
      * 1. The stablecoin state after executing a reaction is the same as the 
@@ -517,6 +517,17 @@ Module Functions.
         timestamps_increase (state.(reactions)) /\
         curr_state_agrees_with_prev_state (state).
 
+    (*
+     * Given 2 states s1, s2, this function calculates the base coin price crash
+     * given by ((y - y') / y) where y, y' is the price of the base coin
+     * (in terms of the pegged currency) before and after the crash respectively
+     *)
+    
+    Definition base_coin_price_crash (s1 : State) (s2 : State) : R :=
+        let price_before_crash := 1 / target_price (s1.(stableCoinState)) in
+        let price_after_crash := 1 / target_price (s2.(stableCoinState)) in
+            (price_before_crash - price_after_crash) / price_before_crash.
+            
 End Functions. 
 
 
