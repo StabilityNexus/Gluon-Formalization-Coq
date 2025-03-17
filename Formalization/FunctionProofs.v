@@ -84,30 +84,31 @@ Module FunctionProofs.
 
 
     Lemma net_volume_lt_basecoins :
-        forall (state : State) (timestamp : nat),
-            Rabs (net_volume (state.(reactions)) (timestamp)) < ((state.(stableCoinState)).(reactorState)).(baseCoins).
+        forall (decay_event : Event) (state : State) (lastTimestamp : nat),
+            Rabs (net_volume (decay_event) (state.(reactions)) (state.(stableCoinState)) (lastTimestamp)) < state.(stableCoinState).(reactorState).(baseCoins).
     Proof.
     Admitted.
 
 
     Lemma beta_decay_pos_fee_lt_1 :
-        forall (state : State) (timestamp : nat),
-            beta_decay_pos_fee (reactions (state)) (stableCoinState (state)) (timestamp) < 1.
+        forall (decay_event : Event) (state : State) (lastTimestamp : nat),
+            beta_decay_pos_fee (decay_event) (state.(reactions)) (state.(stableCoinState)) (lastTimestamp) < 1.
     Proof.
-        intros. assert (net_volume (state.(reactions)) (timestamp) < ((state.(stableCoinState)).(reactorState)).(baseCoins)) as H.
-        { apply abs_lt_implies_lt. apply net_volume_lt_basecoins. }
+        intros. assert 
+        (net_volume (decay_event) (state.(reactions)) (state.(stableCoinState)) (lastTimestamp) < (state.(stableCoinState).(reactorState).(baseCoins))) as H.
+        {  apply abs_lt_implies_lt. apply net_volume_lt_basecoins. }
         destruct state. destruct stableCoinState0. destruct reactorState0.
-        unfold beta_decay_pos_fee. simpl. simpl in H. unfold Rmax. destruct (Rle_dec (net_volume reactions0 timestamp) 0).
+        unfold beta_decay_pos_fee. simpl. simpl in H. unfold Rmax. destruct Rle_dec.
         - unfold Rdiv. rewrite Rmult_0_l. rewrite Rmult_0_r. rewrite Rplus_0_r.
         destruct betaDecayFee_assumption as [H1 H2].
-        apply a_lt_c_strict with (b := extract_value betaDecayFeeNeg).
-            * destruct betaDecayFeePos. simpl. nra.
-            * destruct betaDecayFeeNeg. simpl. nra.
+        apply a_lt_c_strict with (b := extract_value betaDecayFee1).
+            * destruct betaDecayFee0. simpl. nra.
+            * destruct betaDecayFee1. simpl. nra.
             * apply H2.
-        - apply Rlt_le_trans with (r2 := extract_value betaDecayFeePos + extract_value betaDecayFeeNeg).
-            * apply Rplus_lt_compat_l with (r := extract_value betaDecayFeePos).
-            rewrite <- Rmult_1_r. apply Rmult_lt_compat_l with (r := extract_value betaDecayFeeNeg).
-            destruct betaDecayFeeNeg. simpl. apply r. unfold Rdiv.
+        - apply Rlt_le_trans with (r2 := extract_value betaDecayFee0 + extract_value betaDecayFee1).
+            * apply Rplus_lt_compat_l with (r := extract_value betaDecayFee0).
+            rewrite <- Rmult_1_r. apply Rmult_lt_compat_l with (r := extract_value betaDecayFee1).
+            destruct betaDecayFee1. simpl. apply r. unfold Rdiv.
             apply Rmult_lt_reg_r with (r := baseCoins0).
                 + destruct reactorstate_assumption with 
                 (b := baseCoins0) (r := reserveCoins0) (s := stableCoins0) 
@@ -120,8 +121,190 @@ Module FunctionProofs.
             * destruct betaDecayFee_assumption as [H1 H2]. apply H2.
     Qed.
 
+    Lemma beta_decay_pos_fee_gt_0 :
+        forall (decay_event : Event) (state : State) (lastTimestamp : nat),
+            beta_decay_pos_fee (decay_event) (state.(reactions)) (state.(stableCoinState)) (lastTimestamp) > 0.
+    Proof.
+        intros. assert 
+        (net_volume (decay_event) (state.(reactions)) (state.(stableCoinState)) (lastTimestamp) < (state.(stableCoinState).(reactorState).(baseCoins))) as H.
+        {  apply abs_lt_implies_lt. apply net_volume_lt_basecoins. }
+        destruct state; destruct stableCoinState0; destruct reactorState0;
+        unfold beta_decay_pos_fee; unfold Rmax; destruct Rle_dec; simpl.
+        - unfold Rdiv; rewrite Rmult_0_l; rewrite Rmult_0_r; rewrite Rplus_0_r; destruct betaDecayFee_assumption as [H1 H2].
+            * destruct betaDecayFee0; simpl; nra.
+        - apply Rplus_pos_pos.
+            * destruct betaDecayFee0; simpl; nra.
+            * apply Rmult_pos_pos.
+                + destruct betaDecayFee1; simpl; nra.
+                + apply Rdiv_pos_pos.
+                    { simpl in n; nra. }
+                    { apply basecoin_assumption. }
+    Qed.
+
+    Lemma beta_decay_neg_fee_gt_0 :
+        forall (decay_event : Event) (state : State) (lastTimestamp : nat),
+            beta_decay_neg_fee (decay_event) (state.(reactions)) (state.(stableCoinState)) (lastTimestamp) > 0.
+    Proof.
+        intros. assert 
+        (net_volume (decay_event) (state.(reactions)) (state.(stableCoinState)) (lastTimestamp) < (state.(stableCoinState).(reactorState).(baseCoins))) as H.
+        {  apply abs_lt_implies_lt. apply net_volume_lt_basecoins. }
+        destruct state; destruct stableCoinState0; destruct reactorState0;
+        unfold beta_decay_neg_fee; unfold Rmax; destruct Rle_dec; simpl.
+        - unfold Rdiv; rewrite Rmult_0_l; rewrite Rmult_0_r; rewrite Rplus_0_r; destruct betaDecayFee_assumption as [H1 H2].
+            * destruct betaDecayFee0; simpl; nra.
+        - apply Rplus_pos_pos.
+            * destruct betaDecayFee0; simpl; nra.
+            * apply Rmult_pos_pos.
+                + destruct betaDecayFee1; simpl; nra.
+                + apply Rdiv_pos_pos.
+                    { simpl in n; nra. }
+                    { apply basecoin_assumption. }
+    Qed.
+
+    Lemma beta_decay_neg_fee_lt_1 :
+        forall (decay_event : Event) (state : State) (lastTimestamp : nat),
+            beta_decay_neg_fee (decay_event) (state.(reactions)) (state.(stableCoinState)) (lastTimestamp) < 1.
+    Proof.
+        intros. assert 
+        (net_volume (decay_event) (state.(reactions)) (state.(stableCoinState)) (lastTimestamp) < (state.(stableCoinState).(reactorState).(baseCoins)) /\ -(state.(stableCoinState).(reactorState).(baseCoins)) < net_volume (decay_event) (state.(reactions)) (state.(stableCoinState)) (lastTimestamp)) as H.
+        { 
+            apply Rabs_def2. apply net_volume_lt_basecoins.
+        }
+        destruct state. destruct stableCoinState0. destruct reactorState0.
+        unfold beta_decay_neg_fee. simpl. simpl in H. unfold Rmax. destruct Rle_dec.
+        - unfold Rdiv. rewrite Rmult_0_l. rewrite Rmult_0_r. rewrite Rplus_0_r.
+        destruct betaDecayFee_assumption as [H1 H2].
+        apply a_lt_c_strict with (b := extract_value betaDecayFee1).
+            * destruct betaDecayFee0. simpl. nra.
+            * destruct betaDecayFee1. simpl. nra.
+            * apply H2.
+        - apply Rlt_le_trans with (r2 := extract_value betaDecayFee0 + extract_value betaDecayFee1).
+            * apply Rplus_lt_compat_l with (r := extract_value betaDecayFee0).
+            rewrite <- Rmult_1_r. apply Rmult_lt_compat_l.
+            destruct betaDecayFee1. simpl. apply r. unfold Rdiv.
+            apply Rmult_lt_reg_r with (r := baseCoins0).
+                + destruct reactorstate_assumption with 
+                (b := baseCoins0) (r := reserveCoins0) (s := stableCoins0) 
+                as [H1 [H2 H3]]. apply H1.
+                + rewrite Rmult_assoc. rewrite Rinv_l. rewrite Rmult_1_r.
+                rewrite Rmult_1_l. simpl in H. destruct reactorstate_assumption with 
+                (b := baseCoins0) (r := reserveCoins0) (s := stableCoins0) 
+                as [H1 [H2 H3]]. unfold not. intros. nra. apply Rgt_not_eq. apply basecoin_assumption.
+            * destruct betaDecayFee_assumption as [H1 H2]. apply H2.
+    Qed.
         
-    Theorem base_coins_for_n_stable_coins_correctness : 
+    
+
+    Lemma fusion_ratio_div_stablecoin_price :
+        forall (sCS : StableCoinState),
+            fusion_ratio (sCS) / stablecoin_price (sCS) = get_stablecoins (sCS.(reactorState)) / get_basecoins (sCS.(reactorState)).
+    Proof.
+        intros. unfold stablecoin_price. rewrite a_div_b_c_imp_a_mult_c_div_b.
+        apply a_mult_b_div_a_mult_c_imp_b_div_c. apply Rgt_not_eq. 
+        apply fusion_ratio_gt_0.
+    Qed.
+
+    Lemma fusion_ratio_div_reservecoin_price :
+        forall (sCS : StableCoinState),
+            (1 - fusion_ratio (sCS)) / reservecoin_price (sCS) = get_reservecoins (sCS.(reactorState)) / get_basecoins (sCS.(reactorState)).
+    Proof.
+        intros. unfold reservecoin_price. rewrite a_div_b_c_imp_a_mult_c_div_b.
+        apply a_mult_b_div_a_mult_c_imp_b_div_c. apply Rgt_not_eq.
+        apply Rgt_minus. apply fusion_ratio_lt_1.
+    Qed.
+
+
+    Lemma fission_output_alt :
+        forall (sCS : StableCoinState) (bC : BaseCoins),
+            fission_output (bC) (sCS) = 
+            (
+                (bC * (1 - extract_value (fissionFee)) * (get_stablecoins (sCS.(reactorState)))) / (get_basecoins (sCS.(reactorState))), 
+                (bC * (1 - extract_value (fissionFee)) * (get_reservecoins (sCS.(reactorState)))) / (get_basecoins (sCS.(reactorState)))
+            ).
+    Proof.
+        intros. unfold fission_output. 
+        rewrite Rmult_assoc with 
+        (r1 := bC) (r2 := fusion_ratio sCS) 
+        (r3 := 1 - extract_value fissionFee).
+        rewrite Rmult_assoc with 
+        (r1 := bC) (r2 := 1 - fusion_ratio sCS) 
+        (r3 := 1 - extract_value fissionFee).
+        rewrite Rmult_comm with
+        (r1 := fusion_ratio sCS) (r2 := 1 - extract_value fissionFee).
+        rewrite Rmult_comm with
+        (r1 := 1 - fusion_ratio sCS) (r2 := 1 - extract_value fissionFee).
+        rewrite <- Rmult_assoc with 
+        (r1 := bC) (r3 := fusion_ratio sCS) 
+        (r2 := 1 - extract_value fissionFee).
+        rewrite <- Rmult_assoc with 
+        (r1 := bC) (r3 := 1 - fusion_ratio sCS) 
+        (r2 := 1 - extract_value fissionFee).
+        rewrite <- Rmult_div_assoc with
+        (r1 := bC * (1 - extract_value fissionFee)) (r2 := fusion_ratio sCS)
+        (r3 := stablecoin_price sCS).
+        rewrite <- Rmult_div_assoc with
+        (r1 := bC * (1 - extract_value fissionFee)) (r2 := 1 - fusion_ratio sCS)
+        (r3 := reservecoin_price sCS).
+        rewrite fusion_ratio_div_stablecoin_price.
+        rewrite fusion_ratio_div_reservecoin_price.
+        rewrite <- Rmult_div_assoc with
+        (r1 := bC * (1 - extract_value fissionFee)) (r2 := get_reservecoins (reactorState sCS)).
+        rewrite <- Rmult_div_assoc with
+        (r1 := bC * (1 - extract_value fissionFee)) (r2 := get_stablecoins (reactorState sCS)).
+        reflexivity.
+    Qed.
+
+    Lemma beta_decay_pos_output_alt :
+        forall (rC : ReserveCoins) (fee : R) (sCS : StableCoinState),
+            beta_decay_pos_output (rC) (fee) (sCS) = 
+            (rC * (1 - fee) * (1 - fusion_ratio (sCS)) * get_stablecoins (sCS.(reactorState))) / (fusion_ratio (sCS) * get_reservecoins (sCS.(reactorState))).
+    Proof.
+        intros. unfold beta_decay_pos_output.
+        destruct sCS as [[oldBC oldSC oldRC] oldER] eqn:Heqn.
+        rewrite <- Heqn.
+        pose proof reactorstate_assumption (oldBC) (oldRC) (oldSC) as [H1 [H2 H3]].
+        pose proof fusion_ratio_gt_0 (sCS) as H4.  
+        unfold reservecoin_price. unfold stablecoin_price. rewrite Heqn.
+        field_simplify.
+        - reflexivity.
+        - split.
+            + simpl. nra.
+            + simpl. rewrite <- Heqn. nra.
+        - simpl. split.
+            + nra.
+            + split.
+                * nra.
+                * split.
+                    { nra. }
+                    { rewrite <- Heqn. nra. }
+    Qed.
+
+    Lemma beta_decay_neg_output_alt :
+        forall (sC : StableCoins) (fee : R) (sCS : StableCoinState),
+            beta_decay_neg_output (sC) (fee) (sCS) = 
+            (sC * (1 - fee) * (fusion_ratio (sCS)) * get_reservecoins (sCS.(reactorState))) / ((1 - fusion_ratio (sCS)) * get_stablecoins (sCS.(reactorState))).
+    Proof.
+        intros. unfold beta_decay_neg_output.
+        destruct sCS as [[oldBC oldSC oldRC] oldER] eqn:Heqn.
+        rewrite <- Heqn.
+        pose proof reactorstate_assumption (oldBC) (oldRC) (oldSC) as [H1 [H2 H3]].
+        pose proof fusion_ratio_lt_1 (sCS) as H4.  
+        unfold stablecoin_price. unfold reservecoin_price. rewrite Heqn.
+        field_simplify.
+        - reflexivity.
+        - split.
+            + simpl. nra.
+            + simpl. rewrite <- Heqn. nra.
+        - simpl. split.
+            + nra.
+            + split.
+                * nra.
+                * split.
+                    { nra. }
+                    { rewrite <- Heqn. nra. }
+    Qed.
+            
+    (* Theorem base_coins_for_n_stable_coins_correctness : 
     forall
             (state_0 state_1 : State) 
             (timestamp : nat) 
@@ -224,5 +407,5 @@ Module FunctionProofs.
         (stableCoinState state_0) * stablecoin_price (stableCoinState state_1) > 0).
         { apply Rmult_pos_pos. apply reservecoin_price_gt_0. apply stablecoin_price_gt_0. }
         nra. 
-    Qed. 
+    Qed.  *)
 End FunctionProofs.

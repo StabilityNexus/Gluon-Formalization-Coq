@@ -27,8 +27,8 @@ Module Datatypes.
      * + Beta Decay = transmute to neutron
      * - Beta Decay = transmute to proton
      *)
-    Definition BetaDecayFeePos : Type := {x : R | 0 < x}.
-    Definition BetaDecayFeeNeg : Type := {x : R | 0 < x}.
+    Definition BetaDecayFee0 : Type := {x : R | 0 < x}.
+    Definition BetaDecayFee1 : Type := {x : R | 0 < x}.
     Definition TimePeriod : Type := nat.
     Definition Timestamp : Type := nat.
     
@@ -49,11 +49,12 @@ Module Datatypes.
     Definition get_reservecoins (reactorState : ReactorState) : R :=
         reactorState.(reserveCoins).
 
-    Inductive Reaction : Type :=
-    | Fission (baseCoins : BaseCoins) (stableCoins : StableCoins) (reserveCoins : ReserveCoins)
-    | Fusion (stableCoins : StableCoins) (reserveCoins : ReserveCoins) (baseCoins : BaseCoins)
-    | BetaDecayPos (reserveCoins : ReserveCoins) (stableCoins : StableCoins)
-    | BetaDecayNeg (stableCoins : StableCoins) (reserveCoins : ReserveCoins).
+    Inductive Event : Type :=
+    | FissionEvent (baseCoins : BaseCoins)
+    | FusionEvent (baseCoins : BaseCoins)
+    | BetaDecayPosEvent (reserveCoins : ReserveCoins)
+    | BetaDecayNegEvent (stableCoins : StableCoins).
+
 
     Record StableCoinState :=
     {
@@ -72,7 +73,7 @@ Module Datatypes.
                         volume of beta + and beta - reactions
      *)
 
-    Definition Trace : Type := list (StableCoinState * Timestamp * Reaction).
+    Definition Trace : Type := list (StableCoinState * Timestamp * Event).
 
     (*
      * The 'reactions' trace is ordered from MOST RECENT (stored at the head) 

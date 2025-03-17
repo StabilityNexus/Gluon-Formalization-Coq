@@ -5,4 +5,7 @@ Formalization/Datatypes.v
 Formalization/Functions.v
 Formalization/HelperLemmas.v
 Formalization/FunctionProofs.v
-Formalization/Theorem1.v
+# Formalization/Theorem1.v
+Formalization/Theorem3.v
+Formalization/Theorem4.v
+Formalization/Theorem5.v
