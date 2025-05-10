@@ -188,16 +188,17 @@ Module Functions.
         match reactions with
         | nil => 0
         | (sCS, t, e) :: reactions' =>
-            if ((lastTimestamp - timePeriod) <=? t) && (t <=? lastTimestamp) then
-            match e with
-            | BetaDecayPosEvent reserveCoins =>
-                let volume := reserveCoins * reservecoin_price (sCS) in
-                volume + net_volume_before (reactions') (lastTimestamp)
-            | BetaDecayNegEvent stableCoins =>
-                let volume := stableCoins * stablecoin_price (sCS) in
-                (-volume) + net_volume_before (reactions') (lastTimestamp)
-            | _ => net_volume_before (reactions') (lastTimestamp)
-            end
+            if ((lastTimestamp - timePeriod) <=? t) && (t <=? lastTimestamp) 
+            then
+                match e with
+                | BetaDecayPosEvent reserveCoins =>
+                    let volume := reserveCoins * reservecoin_price (sCS) in
+                    volume + net_volume_before (reactions') (lastTimestamp)
+                | BetaDecayNegEvent stableCoins =>
+                    let volume := stableCoins * stablecoin_price (sCS) in
+                    (-volume) + net_volume_before (reactions') (lastTimestamp)
+                | _ => net_volume_before (reactions') (lastTimestamp)
+                end
             else
                 0
         end.
@@ -322,15 +323,15 @@ Module Functions.
     Definition beta_decay_pos_reaction
         (stableCoinState : StableCoinState) 
         (beta_decay_pos_fee : R)
-        (protonsInput : ReserveCoins) : StableCoinState :=
+        (reserveCoins : ReserveCoins) : StableCoinState :=
         let reserveCoinsContract := get_reservecoins (stableCoinState.(reactorState)) in
-        let neutrons := beta_decay_pos_output
-                        (protonsInput) (beta_decay_pos_fee) (stableCoinState) in
+        let stableCoins := beta_decay_pos_output
+                        (reserveCoins) (beta_decay_pos_fee) (stableCoinState) in
         let oldReactorState := stableCoinState.(reactorState) in
         let newReactorState := Build_ReactorState 
                                 (get_basecoins (oldReactorState))
-                                (get_stablecoins (oldReactorState) + neutrons)
-                                (get_reservecoins (oldReactorState) - protonsInput) 
+                                (get_stablecoins (oldReactorState) + stableCoins)
+                                (get_reservecoins (oldReactorState) - reserveCoins) 
                                 in
         Build_StableCoinState 
             (newReactorState) (stableCoinState.(exchangeRate)).
@@ -345,18 +346,23 @@ Module Functions.
     Definition beta_decay_neg_reaction
         (stableCoinState : StableCoinState) 
         (beta_decay_neg_fee : R)
-        (neutronsInput : StableCoins) : StableCoinState :=
+        (stableCoins : StableCoins) : StableCoinState :=
         let stableCoinsContract := get_stablecoins (stableCoinState.(reactorState)) in
-        let protons := beta_decay_neg_output
-                        (neutronsInput) (beta_decay_neg_fee) (stableCoinState) in
+        let reserveCoins := beta_decay_neg_output
+                        (stableCoins) (beta_decay_neg_fee) (stableCoinState) in
         let oldReactorState := stableCoinState.(reactorState) in
         let newReactorState := Build_ReactorState 
                                 (get_basecoins (oldReactorState))
-                                (get_stablecoins (oldReactorState) - neutronsInput)
-                                (get_reservecoins (oldReactorState) + protons) 
+                                (get_stablecoins (oldReactorState) - stableCoins)
+                                (get_reservecoins (oldReactorState) + reserveCoins) 
                                 in
         Build_StableCoinState 
             (newReactorState) (stableCoinState.(exchangeRate)).
+
+    (*
+     * This function executes the reaction and returns the new state
+     * after executing the reaction.
+     *)
     
     Definition execute (s : State) (e : Event) (t : Timestamp) : State :=
         let oldSCS := s.(stableCoinState) in
@@ -364,13 +370,12 @@ Module Functions.
         match e with
         | FissionEvent (bC) => 
             let newSCS := fission_reaction (oldSCS) (bC) in
-            let (sC, rC) := fission_output (bC) (oldSCS) in
             let newT := (oldSCS, t, e) :: oldT in
             Build_State (newSCS) (newT)
         | FusionEvent (bC) =>
-            if Rlt_dec (bC) (get_basecoins (s.(stableCoinState).(reactorState))) then
+            if Rlt_dec (bC) (get_basecoins (s.(stableCoinState).(reactorState))) 
+            then
                 let newSCS := fusion_reaction (oldSCS) (bC) in
-                let (sC, rC) := fusion_output (bC) (oldSCS) in
                 let newT := (oldSCS, t, e) :: oldT in
                 Build_State (newSCS) (newT)
             else
@@ -380,10 +385,10 @@ Module Functions.
          * volume of the current transaction 
          *)
         | BetaDecayPosEvent (rC) =>
-            if Rlt_dec (rC) (get_reservecoins (s.(stableCoinState).(reactorState))) then
+            if Rlt_dec (rC) (get_reservecoins (s.(stableCoinState).(reactorState))) 
+            then
                 let fee := beta_decay_pos_fee (e) (s.(reactions)) (s.(stableCoinState)) (t) in
                 let newSCS := beta_decay_pos_reaction (oldSCS) (fee) (rC) in
-                let sC := beta_decay_pos_output (rC) (fee) (oldSCS) in
                 let newT := (oldSCS, t, e) :: oldT in
                 Build_State (newSCS) (newT)
             else
@@ -393,10 +398,10 @@ Module Functions.
          * volume of the current transaction 
          *)
         | BetaDecayNegEvent (sC) =>
-            if Rlt_dec (sC) (get_stablecoins (s.(stableCoinState).(reactorState))) then
+            if Rlt_dec (sC) (get_stablecoins (s.(stableCoinState).(reactorState))) 
+            then
                 let fee := beta_decay_neg_fee (e) (s.(reactions)) (s.(stableCoinState)) (t) in
                 let newSCS := beta_decay_neg_reaction (oldSCS) (fee) (sC) in
-                let rC := beta_decay_neg_output (sC) (fee) (oldSCS) in
                 let newT := (oldSCS, t, e) :: oldT in
                 Build_State (newSCS) (newT)
             else
@@ -417,16 +422,16 @@ Module Functions.
      *                   converted to stablecoins
      *)
     
-    (* Definition stablecoins_from_m_basecoins
+    Definition stablecoins_from_m_basecoins
         (state_0 : State)
         (timestamp : nat)
         (state_1 : State)
-        (basecoins : R) 
+        (baseCoins : R) 
         (fracProtonsDecay : R) : R :=
-    let (stablecoins, reservecoins) := fission_output (basecoins) (state_0.(stableCoinState)) in
-    let betaDecayFeePos := beta_decay_pos_fee (state_1.(reactions)) (state_1.(stableCoinState)) (timestamp) in
-    let stablecoinsFromDecay := beta_decay_pos_output (reservecoins * fracProtonsDecay) (betaDecayFeePos) (state_1.(stableCoinState)) in
-    stablecoins + stablecoinsFromDecay. *)
+    let (stableCoins, reserveCoins) := fission_output (baseCoins) (state_0.(stableCoinState)) in
+    let betaDecayFeePos := beta_decay_pos_fee (BetaDecayPosEvent (reserveCoins)) (state_1.(reactions)) (state_1.(stableCoinState)) (timestamp) in
+    let stablecoinsFromDecay := beta_decay_pos_output (reserveCoins * fracProtonsDecay) (betaDecayFeePos) (state_1.(stableCoinState)) in
+    stableCoins + stablecoinsFromDecay.
     
     (*
      * This functions gives us the number of base coins we have to use for 
@@ -438,7 +443,7 @@ Module Functions.
      *                   converted to stablecoins
      *)
 
-    (* Definition base_coins_for_n_stable_coins
+    Definition base_coins_for_n_stable_coins
         (state_0 : State)
         (timestamp : nat)
         (state_1 : State)
@@ -449,18 +454,18 @@ Module Functions.
         let sInit := stablecoin_price (state_0.(stableCoinState)) in
         let sNew := stablecoin_price (state_1.(stableCoinState)) in
         let fInit := fusion_ratio (state_0.(stableCoinState)) in
-        let betaPlusInit := beta_decay_pos_fee (state_1.(reactions)) (state_1.(stableCoinState)) (timestamp) in
+        let betaPlusInit := beta_decay_pos_fee (BetaDecayPosEvent ()) (state_1.(reactions)) (state_1.(stableCoinState)) (timestamp) in
         let fissionFeeVal := extract_value (fissionFee) in
         (rInit * sNew * sInit * stablecoinsRequired) / 
         ((fInit * (1 - fissionFeeVal) * rInit * sNew) + 
-        ((1 - fInit) * fracProtonsDecay * (1 - fissionFeeVal) * (1 - betaPlusInit) * rNew * sInit)). *)
+        ((1 - fInit) * fracProtonsDecay * (1 - fissionFeeVal) * (1 - betaPlusInit) * rNew * sInit)).
     
     
     (*
      * This function returns the effective fee in terms of base coins for the
      * action of selling/buying a stablecoin
      *)
-    (* Definition get_effective_fee
+    Definition get_effective_fee
         (timestamp : nat)
         (state_0 : State) 
         (state_1 : State)
@@ -471,7 +476,7 @@ Module Functions.
             let baseCoinsForOneStableCoin := base_coins_for_n_stable_coins (state_0) (timestamp) (state_1) (1) (1) in
             let stableCoinPriceBeforeFission := stablecoin_price (state_0.(stableCoinState)) in
             (baseCoinsForOneStableCoin / stableCoinPriceBeforeFission) - 1
-        end. *)
+        end.
     
     (*
      * This function returns the price of buying/selling a stablecoin in terms
@@ -538,21 +543,21 @@ Module Functions.
             | nil => True
             | (s_1, t_1, e_1) :: reactions'' =>
                 match e_1 with
-                | FissionEvent (nuclei) => 
-                    (s_2 = fission_reaction (s_1) (nuclei)) /\ 
+                | FissionEvent (baseCoins) => 
+                    (s_2 = fission_reaction (s_1) (baseCoins)) /\ 
                     states_follow (reactions')
-                | FusionEvent (nuclei) =>
-                    (s_2 = fusion_reaction (s_1) (nuclei)) /\ 
+                | FusionEvent (baseCoins) =>
+                    (s_2 = fusion_reaction (s_1) (baseCoins)) /\ 
                     states_follow (reactions')
-                | BetaDecayPosEvent (protons) =>
+                | BetaDecayPosEvent (reserveCoins) =>
                     let beta_decay_pos_fee_val := 
                     beta_decay_pos_fee (e_1) (reactions'') (s_1) (t_1) in
-                    (s_2 = beta_decay_pos_reaction (s_1) (beta_decay_pos_fee_val) (protons)) /\
+                    (s_2 = beta_decay_pos_reaction (s_1) (beta_decay_pos_fee_val) (reserveCoins)) /\
                     states_follow (reactions')
-                | BetaDecayNegEvent (neutrons) =>
+                | BetaDecayNegEvent (stableCoins) =>
                     let beta_decay_neg_fee_val := 
                     beta_decay_neg_fee (e_1) (reactions'') (s_1) (t_1) in
-                    (s_2 = beta_decay_neg_reaction (s_1) (beta_decay_neg_fee_val) (neutrons)) /\
+                    (s_2 = beta_decay_neg_reaction (s_1) (beta_decay_neg_fee_val) (stableCoins)) /\
                     states_follow (reactions')
                 end
             end
@@ -578,23 +583,23 @@ Module Functions.
             | nil => True
             | (s, t, e) :: reactions' =>
                 match e with
-                | FissionEvent (nuclei) => 
-                    currStableCoinState = fission_reaction (s) (nuclei)
-                | FusionEvent (nuclei) => 
+                | FissionEvent (baseCoins) => 
+                    currStableCoinState = fission_reaction (s) (baseCoins)
+                | FusionEvent (baseCoins) => 
                     currStableCoinState = 
-                    fusion_reaction (s) (nuclei)
-                | BetaDecayPosEvent (protons) =>
+                    fusion_reaction (s) (baseCoins)
+                | BetaDecayPosEvent (reserveCoins) =>
                     let beta_decay_pos_fee_val := 
                     beta_decay_pos_fee (e) (reactions') (s) (t) in
                     currStableCoinState = 
                     beta_decay_pos_reaction 
-                    (s) (beta_decay_pos_fee_val) (protons)
-                | BetaDecayNegEvent (neutrons) =>
+                    (s) (beta_decay_pos_fee_val) (reserveCoins)
+                | BetaDecayNegEvent (stableCoins) =>
                     let beta_decay_neg_fee_val := 
                     beta_decay_neg_fee (e) (reactions') (s) (t) in
                     currStableCoinState = 
                     beta_decay_neg_reaction 
-                    (s) (beta_decay_neg_fee_val) (neutrons)
+                    (s) (beta_decay_neg_fee_val) (stableCoins)
                 end
             end.
 
