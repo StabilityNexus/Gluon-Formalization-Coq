@@ -62,6 +62,16 @@ Module HelperLemmas.
         reflexivity. 
     Qed.
 
+    Lemma a_div_b_mult_c_imp_a_mult_1_div_c_div_b :
+        forall (a b c : R),
+            a / (b * c) = (a * (1 / c)) / b.
+    Proof.
+        intros. unfold Rdiv. rewrite Rmult_comm with (r1 := b).
+        rewrite Rinv_mult. rewrite Rmult_assoc with (r2 := 1 * / c).
+        assert (1 * / c = / c) as H.
+        { rewrite Rmult_1_l. reflexivity. } rewrite H. reflexivity.
+    Qed.
+
     Lemma a_mult_b_div_a_mult_c_imp_b_div_c :
         forall (a b c : R),
             a <> 0 -> (a * b) / (a * c) = b / c.
@@ -170,5 +180,53 @@ Module HelperLemmas.
         - rewrite Rinv_mult. rewrite <- Rmult_1_r.
         apply Rmult_lt_compat_l with (r := /b). apply Rinv_pos. apply H0.
         rewrite <- Rinv_1. apply Rinv_0_lt_contravar. nra. apply H1.
+    Qed.
+
+    Lemma rmin_a_b_eq_b_imp_b_le_a :
+        forall (a b : R),
+            Rmin a b = b -> b <= a.
+    Proof.
+        intros; unfold Rmin in H; destruct Rle_dec in H; lra.
+    Qed.
+
+    Lemma b_gt_c_imp_a_div_b_lt_a_div_c :
+        forall (a b c : R),
+            a > 0 -> c > 0 -> b > c -> a / b < a / c.
+    Proof.
+        intros. unfold Rdiv. apply Rmult_lt_compat_l.
+        - apply H.
+        - apply Rinv_0_lt_contravar; nra.       
+    Qed.
+
+    Lemma mult_div_assoc : forall a b c d : R,
+        c <> 0 -> d <> 0 ->
+        (a * (b / c)) / d = (a * b) / (d * c).
+    Proof.
+        intros a b c d Hc Hd.
+        unfold Rdiv.
+        rewrite <- Rmult_assoc.        
+        rewrite Rmult_assoc with (r1 := a) (r2 := b) (r3 := / c).
+        rewrite <- Rmult_assoc. rewrite Rmult_comm with (r1 := d) (r2 := c).
+        rewrite Rinv_mult; try lra.
+    Qed.
+
+    Lemma mul_div_eq_div_div : forall a b d : R,
+        b <> 0 -> d <> 0 ->
+        (a * b) / d = a / (d / b).
+    Proof.
+        intros a b d Hb Hd.
+        unfold Rdiv. rewrite Rmult_comm with (r1 := d) (r2 := /b). 
+        rewrite Rinv_mult; try lra. 
+        - rewrite <- Rmult_assoc. rewrite Rinv_inv. reflexivity.
+    Qed.
+
+    Lemma sub_eq_mul_div_sub_one : forall a b : R,
+        b <> 0 ->
+        a - b = b * (a / b - 1).
+    Proof.
+        intros a b Hb.
+        unfold Rdiv.
+        field.
+        assumption.
     Qed.
 End HelperLemmas.

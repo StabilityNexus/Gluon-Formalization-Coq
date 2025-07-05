@@ -35,6 +35,16 @@ Module FunctionProofs.
             * nra.
     Qed.
 
+    Lemma reserve_ratio_gt_0 :
+        forall stableCoinState : StableCoinState,
+            reserve_ratio (stableCoinState) > 0.
+    Proof.
+        intros. unfold reserve_ratio. apply Rdiv_pos_pos.
+        - lra.
+        - apply fusion_ratio_gt_0.  
+    Qed.
+
+
     Lemma fusion_ratio_lt_1 :
         forall stableCoinState : StableCoinState,
             fusion_ratio (stableCoinState) < 1.
@@ -45,7 +55,16 @@ Module FunctionProofs.
         - destruct a. apply H0.
     Qed.
 
-
+    Lemma reserve_ratio_gt_1 :
+        forall stableCoinState : StableCoinState,
+            reserve_ratio (stableCoinState) > 1.
+    Proof.
+        intros. unfold reserve_ratio. apply division_greater_than_one.
+        - apply fusion_ratio_lt_1.
+        - apply fusion_ratio_gt_0.
+    Qed.  
+        
+    
     Lemma stablecoin_price_gt_0 :
         forall state : State,
             stablecoin_price (stableCoinState state) > 0.
@@ -304,63 +323,65 @@ Module FunctionProofs.
                     { rewrite <- Heqn. nra. }
     Qed.
             
-    (* Theorem base_coins_for_n_stable_coins_correctness : 
+    Lemma base_coins_for_n_stable_coins_correctness : 
     forall
-            (state_0 state_1 : State) 
-            (timestamp : nat) 
-            (stablecoinsRequired : R)
-            (fracProtonsDecay : R)
-            (fracPos : 0 < fracProtonsDecay < 1),
-        stablecoins_from_m_basecoins (state_0) (timestamp) (state_1) 
-        (base_coins_for_n_stable_coins (state_0) (timestamp) 
-        (state_1) (stablecoinsRequired) (fracProtonsDecay)) (fracProtonsDecay) = 
-        stablecoinsRequired.
+        (state_0 state_1 : State) 
+        (timestamp : nat) 
+        (stablecoinsRequired : R)
+        (fracProtonsDecay : R)
+        (fracPosRangeProof : 0 < fracProtonsDecay < 1)
+        (betaDecayPosFeeVal : R)
+        (betaDecayPosFeeValRangeProof : 0 < betaDecayPosFeeVal < 1),
+    stablecoins_from_m_basecoins (state_0) (timestamp) (state_1) 
+    (
+        base_coins_for_n_stable_coins (state_0) (timestamp) (state_1) 
+        (stablecoinsRequired) (betaDecayPosFeeVal) (fracProtonsDecay)
+    ) (betaDecayPosFeeVal) (fracProtonsDecay) = stablecoinsRequired.
     Proof.
-        intros. unfold base_coins_for_n_stable_coins.
+        intros. 
+        (* Unfolding definitions *)
+        unfold base_coins_for_n_stable_coins. 
         unfold stablecoins_from_m_basecoins. unfold beta_decay_pos_output. 
         unfold fission_output.
+        (* Substituting simple variables *)
         set (r := (reservecoin_price (stableCoinState state_0))).
         set (s' := stablecoin_price (stableCoinState state_1)).
         set (s := stablecoin_price (stableCoinState state_0)).
         set (N := stablecoinsRequired).
-        set (f := fusion_ratio (stableCoinState state_0)).
-        set (fissionFeeVal := extract_value fissionFee).
-        set (
-                betaPlusInit := 
-                beta_decay_pos_fee (reactions state_1) (stableCoinState state_1) 
-                timestamp
-            ).
+        set (q := fusion_ratio (stableCoinState state_0)).
+        set (fiss := extract_value fissionFee).
         set (r' := reservecoin_price (stableCoinState state_1)).
-        set (baseCoins := r * s' * s * N /
-        (f * (1 - fissionFeeVal) * r * s' +
-            (1 - f) * fracProtonsDecay *
-            (1 - fissionFeeVal) * (1 - betaPlusInit) *
-            r' * s)).
-        rewrite <- Rmult_div_assoc with (r2 := 1 - fissionFeeVal).
-        rewrite Rmult_assoc with (r2 := f).
-        assert (baseCoins * (1 - f) * (1 - fissionFeeVal) /
-        r * fracProtonsDecay * (1 - betaPlusInit) *
-        r' / s' = baseCoins * (1 - f) * (1 - fissionFeeVal) /
-        r * (fracProtonsDecay * (1 - betaPlusInit) *
+        set 
+        (
+            b := r * s' * s * N / (q * (1 - fiss) * r * s' + (1 - q) * 
+            fracProtonsDecay * (1 - fiss) * (1 - betaDecayPosFeeVal) *
+            r' * s)
+        ).
+        rewrite <- Rmult_div_assoc with (r2 := 1 - fiss).
+        rewrite Rmult_assoc with (r2 := q).
+        assert (b * (1 - q) * (1 - fiss) /
+        r * fracProtonsDecay * (1 - betaDecayPosFeeVal) *
+        r' / s' = b * (1 - q) * (1 - fiss) /
+        r * (fracProtonsDecay * (1 - betaDecayPosFeeVal) *
         r') / s') as H.
         { lra. } rewrite H. rewrite <- Rmult_div_swap with (r3 := r). simpl.
         rewrite <- Rdiv_mult_distr with (r2 := r).
-        assert (baseCoins * (1 - f) * (1 - fissionFeeVal) *
-        (fracProtonsDecay * (1 - betaPlusInit) * r') /
-        (r * s') = baseCoins * (((1 - f) * (1 - fissionFeeVal) * fracProtonsDecay * (1 - betaPlusInit) * r') / (r * s'))) as H1.
+        assert (b * (1 - q) * (1 - fiss) *
+        (fracProtonsDecay * (1 - betaDecayPosFeeVal) * r') /
+        (r * s') = b * (((1 - q) * (1 - fiss) * fracProtonsDecay * (1 - betaDecayPosFeeVal) * r') / (r * s'))) as H1.
         { nra. } rewrite H1.
-        rewrite <- Rmult_plus_distr_l with (r1 := baseCoins).
-        assert (f * ((1 - fissionFeeVal) / s) = f * (1 - fissionFeeVal) / s) as H2.
+        rewrite <- Rmult_plus_distr_l with (r1 := b).
+        assert (q * ((1 - fiss) / s) = q * (1 - fiss) / s) as H2.
         { nra. } rewrite H2.
         rewrite add_frac_real with (b := s) (d := r * s').
         rewrite Rmult_assoc with (r3 := fracProtonsDecay).
-        rewrite Rmult_comm with (r1 := 1 - fissionFeeVal).
-        rewrite <- Rmult_assoc with (r3 := 1 - fissionFeeVal).
+        rewrite Rmult_comm with (r1 := 1 - fiss).
+        rewrite <- Rmult_assoc with (r3 := 1 - fiss).
         rewrite <- Rmult_assoc with (r3 := s').
-        unfold baseCoins.
-        set (denom := f * (1 - fissionFeeVal) * r * s' +
-        (1 - f) * fracProtonsDecay *
-        (1 - fissionFeeVal) * (1 - betaPlusInit) *
+        unfold b.
+        set (denom := q * (1 - fiss) * r * s' +
+        (1 - q) * fracProtonsDecay *
+        (1 - fiss) * (1 - betaDecayPosFeeVal) *
         r' * s). unfold Rdiv. rewrite <- Rmult_assoc with (r3 := / (s * (r * s'))).
         rewrite Rmult_assoc with (r3 := denom).
         rewrite Rmult_inv_l with (r := denom).
@@ -384,7 +405,7 @@ Module FunctionProofs.
             unfold denom. apply Rplus_pos_nneg.
             - apply Rmult_pos_pos. apply Rmult_pos_pos. apply Rmult_pos_pos.
                 * unfold f. apply fusion_ratio_gt_0.
-                * apply Rgt_minus. unfold fissionFeeVal. destruct fissionFee.
+                * apply Rgt_minus. unfold fiss. destruct fissionFee.
                 simpl. destruct a. apply r1.
                 * unfold r. apply reservecoin_price_gt_0.
                 * unfold s'. apply stablecoin_price_gt_0.
@@ -392,11 +413,11 @@ Module FunctionProofs.
             apply Rmult_le_pos. apply Rmult_le_pos.
                 * apply Rge_le. apply Rge_minus. apply Rgt_ge. apply Rlt_gt.
                 unfold f. apply fusion_ratio_lt_1.
-                * apply Rlt_le. destruct fracPos. apply H3.
+                * apply Rlt_le. destruct fracPosRangeProof. apply H3.
                 * apply Rge_le. apply Rge_minus. apply Rgt_ge. apply Rlt_gt.
-                unfold fissionFeeVal. destruct fissionFee. simpl. destruct a. apply r1.
+                unfold fiss. destruct fissionFee. simpl. destruct a. apply r1.
                 * apply Rge_le. apply Rge_minus. apply Rgt_ge. apply Rlt_gt.
-                unfold betaPlusInit. apply beta_decay_pos_fee_lt_1.
+                destruct betaDecayPosFeeValRangeProof. apply H4.
                 * apply Rlt_le. unfold r'. apply reservecoin_price_gt_0.
                 * apply Rlt_le. unfold s. apply stablecoin_price_gt_0.
         } nra.
@@ -407,5 +428,160 @@ Module FunctionProofs.
         (stableCoinState state_0) * stablecoin_price (stableCoinState state_1) > 0).
         { apply Rmult_pos_pos. apply reservecoin_price_gt_0. apply stablecoin_price_gt_0. }
         nra. 
-    Qed.  *)
+    Qed. 
+
+    (*
+     * If fusion ratio is pegged then the stablecoin price equals the target 
+     * price.
+     *)
+    Lemma fusion_ratio_pegged_stablecoin_price_equals_target_price :
+    forall 
+        (stableCoinState : StableCoinState)
+        (s e b : R),
+        s = get_stablecoins (stableCoinState.(reactorState)) ->
+        e = target_price (stableCoinState) ->
+        b = get_basecoins (stableCoinState.(reactorState)) ->
+        fusion_ratio (stableCoinState) = (s * e) / b ->
+        stablecoin_price (stableCoinState) = target_price (stableCoinState).
+    Proof.
+        intros. unfold stablecoin_price. unfold target_price.
+        rewrite <- H. unfold target_price in H0. rewrite <- H0. 
+        rewrite <- H1. rewrite H2. field_simplify.
+        - reflexivity.
+        - split.
+            + apply Rgt_not_eq. apply stablecoin_assumption.
+            + apply Rgt_not_eq. apply basecoin_assumption.
+    Qed.
+
+    (*
+     * If reserve ratio > 1/q* then fusion ratio is pegged
+     *)
+    Lemma reserve_ratio_gt_q_star_fusion_ratio_pegged :
+    forall 
+        (stableCoinState : StableCoinState)
+        (s e b : R),
+        s = get_stablecoins (stableCoinState.(reactorState)) ->
+        e = get_exchange_rate (stableCoinState) ->
+        b = get_basecoins (stableCoinState.(reactorState)) ->
+        reserve_ratio (stableCoinState) > /extract_value qStar ->
+        fusion_ratio (stableCoinState) = (s * e) / b.
+    Proof.
+        intros. unfold reserve_ratio in H2.
+        apply Rinv_0_lt_contravar with (r1 := /extract_value qStar) in H2.
+        rewrite Rdiv_1_l in H2. repeat rewrite Rinv_inv in H2.
+        unfold fusion_ratio in H2.
+        apply rmin_ab_lt_a_imp_b in H2.
+        - unfold fusion_ratio. subst. apply H2.
+        - destruct qStar as [qs Hqs]. simpl. apply Rinv_0_lt_compat. nra.
+    Qed.
+
+    (*
+     * If I start in a pegged state and perform a fission reaction I will stay
+     * in a pegged state.
+     *)
+    Lemma fission_reaction_preserves_pegged_state :
+    forall 
+        (state0 state1 : State)
+        (timestamp : nat)
+        (m : R)
+        (sC0 eR0 bC0 sC1 eR1 bC1 : R),
+        m > 0 ->
+        sC0 = get_stablecoins (state0.(stableCoinState).(reactorState)) ->
+        eR0 = get_exchange_rate (state0.(stableCoinState)) ->
+        bC0 = get_basecoins (state0.(stableCoinState).(reactorState)) ->
+        sC1 = get_stablecoins (state1.(stableCoinState).(reactorState)) ->
+        eR1 = get_exchange_rate (state1.(stableCoinState)) ->
+        bC1 = get_basecoins (state1.(stableCoinState).(reactorState)) ->
+        fusion_ratio (state0.(stableCoinState)) = (sC0 * eR0) / bC0 ->
+        state1 = execute (state0) (FissionEvent (m)) (timestamp) ->
+        fusion_ratio (state1.(stableCoinState)) = (sC1 * eR1) / bC1.
+    Proof.
+        (* Rewriting and simplifying the goal *)
+        intros; unfold fusion_ratio; rewrite <- H3; rewrite <- H4; rewrite <- H5.
+        (* Transforming goal into sC1 * eR1 / bC1 < qStar *)
+        apply Rmin_right; apply Rlt_le.
+        (* Applying transitivity and generating 2 subgoals
+         * 1. sC1 * eR1 / bC1 < sC0 * eR0 / bC0
+         * 2. sC0 * eR0 / bC0 <= qStar
+         *)
+        apply Rlt_le_trans with (r2 := (sC0 * eR0) / bC0).
+        (* Proving the first subgoal by showing:
+         * 1. sC1 * eR1 / bC1 = ((sC0 * eR0) / bC0) * ((bC0 + m*(1-fissionFee)) / (bC0 + m))
+         * 2. showing that (bC0 + m*(1-fissionFee)) / (bC0 + m) < 1
+         * TODO: How to simplify the proofs after field_simplify?
+         *)
+        (* Proving 1*)
+        - assert (sC1 * eR1 / bC1 = (sC0 * eR0 / bC0) * ((bC0 + m * (1 - extract_value fissionFee)) / (bC0 + m))) as H8.
+          { 
+            unfold execute in H7; unfold fission_reaction in H7; 
+            unfold fission_output in H7; unfold stablecoin_price in H7; 
+            rewrite H6 in H7; rewrite <- H0 in H7; rewrite <- H1 in H7; rewrite <- H2 in H7; 
+            rewrite H7 in H3; rewrite H7 in H4; rewrite H7 in H5; simpl in H3; 
+            simpl in H4; simpl in H5; rewrite H3; rewrite H4; rewrite H5; simpl;
+            field_simplify.
+            - reflexivity.
+            - split. 
+                + apply Rgt_not_eq. apply Rplus_pos_pos. 
+                    * apply basecoin_assumption.
+                    * apply H.
+                + apply Rgt_not_eq. apply basecoin_assumption.
+            - split.
+                + apply Rgt_not_eq. apply basecoin_assumption.
+                + repeat split.
+                    * apply Rgt_not_eq. apply stablecoin_assumption.
+                    * apply Rgt_not_eq. apply exchangerate_assumption.
+                    * apply Rgt_not_eq. apply Rplus_pos_pos. 
+                        -- apply basecoin_assumption.
+                        -- apply H.
+          }
+          (* Proving 2 *)
+          assert ((bC0 + m * (1 - extract_value fissionFee)) / (bC0 + m) < 1) as H9.
+          {
+            apply division_less_than_one. 
+            - apply Rplus_lt_compat_l. rewrite <- Rmult_1_r. 
+            apply Rmult_lt_compat_l.
+                + apply basecoin_assumption.
+                + destruct fissionFee. simpl. lra.
+            - apply Rplus_pos_pos; apply basecoin_assumption.
+          }
+          (* Tying the proofs together *)
+          rewrite H8; rewrite <- Rmult_1_r; apply Rmult_lt_compat_l.
+          + apply Rdiv_pos_pos.
+            * apply Rmult_pos_pos; try apply stablecoin_assumption; try apply exchangerate_assumption.
+            * apply basecoin_assumption.
+          + apply H9.
+        (* Proving the second subgoal by showing that sC0 * eR0 / bC0 <= qStar *)
+        - apply rmin_a_b_eq_b_imp_b_le_a; unfold fusion_ratio in H6;
+        rewrite <- H0 in H6; rewrite <- H1 in H6; rewrite <- H2 in H6; apply H6.
+    Qed.
+
+    Lemma actual_price_le_target_price_neutron :
+  	forall 
+		(sCS : StableCoinState),
+    stablecoin_price (sCS) <= target_price (sCS).
+	Proof.
+		intros [ [bC sC rC] eX ].
+		unfold stablecoin_price, target_price, fusion_ratio, Rmin.
+		destruct qStar as [qS HqS]; simpl.
+		assert (bC > 0) by apply basecoin_assumption.
+		assert (sC > 0) by apply stablecoin_assumption.
+		destruct (Rle_dec qS (sC * eX / bC)) as [Hle | Hgt].
+		- (* Pegged state: qS <= sC * eX / bC *)
+		apply Rmult_le_compat_r with (r := bC) in Hle; [| lra ].
+		unfold Rdiv in Hle. rewrite Rmult_assoc in Hle.
+		rewrite Rinv_l in Hle; [| lra].
+		rewrite Rmult_1_r in Hle.
+		apply Rmult_le_compat_r with (r := / sC) in Hle; [| apply Rlt_le, Rinv_0_lt_compat; lra ].
+		rewrite Rmult_assoc with (r1 := sC) (r2 := eX) in Hle.
+		rewrite Rmult_comm with (r1 := eX) in Hle.
+		rewrite <- Rmult_assoc in Hle.
+		rewrite Rinv_r in Hle; [| lra].
+		rewrite Rmult_1_l in Hle.
+		exact Hle.
+		- (* Non-pegged state: qS > sC * eX / bC, so price is target price *)
+		unfold Rdiv. rewrite Rmult_assoc with (r1 := sC * eX). 
+		rewrite Rinv_l; [| lra]. rewrite Rmult_1_r. 
+		rewrite Rmult_comm with (r1 := sC * eX). rewrite <- Rmult_assoc. 
+		rewrite Rinv_l; [| lra]. rewrite Rmult_1_l. apply Rle_refl.
+	Qed.
 End FunctionProofs.
