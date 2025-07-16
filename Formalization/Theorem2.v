@@ -1,104 +1,136 @@
 From StableCoinFormalization Require Export Datatypes.
 From StableCoinFormalization Require Export HelperFunctions.
 From StableCoinFormalization Require Export Functions.
+From StableCoinFormalization Require Export FunctionProofs.
 From StableCoinFormalization Require Export HelperLemmas.
-Require Export Lqa.
-Require Export Lia.
-
+Require Export Lra.
+Local Open Scope R_scope.
 Module Theorem2.
     Import Datatypes.
     Import HelperFunctions.
-    Import HelperLemmas.
     Import Functions.
-    Import Qminmax.
-    Import QArith.
-    Import Lqa.
-    Import Lia.
-
-    Lemma actual_price_le_target_price_neutron :
-        forall 
-            (stableCoinState : StableCoinState),
-            neutron_price (stableCoinState) <= target_price (stableCoinState).
-        
-        Proof.
-            intros stableCoinState. 
-            destruct stableCoinState as [reactorState exchangeRate].
-            destruct reactorState as [nuclei neutrons protons].
-            destruct nuclei as [nu Hnu]. destruct neutrons as [n Hn]. 
-            destruct protons as [p Hp]. destruct exchangeRate as [ex Hex].
-            unfold neutron_price. unfold fusion_ratio. unfold target_price. 
-            simpl. destruct qStar as [qs Hqs]. simpl. 
-            destruct (Q.min_spec (qs) (n * ex / nu)) as [] eqn:E. 
-            - destruct a as [H1 H2]. rewrite H2. unfold Qdiv.
-            apply Qmult_lt_compat_r with (z:=nu) in H1 as H3.
-            unfold Qdiv in H3.
-            rewrite <- Qmult_assoc in H3.
-            assert (/nu * nu == nu * / nu) as H4.
-            { apply Qmult_comm. }
-            rewrite H4 in H3. rewrite Qmult_inv_r in H3. 
-            rewrite Qmult_1_r in H3.
-            apply Qmult_lt_compat_r with (z:=/n) in H3.
-            rewrite <- Qmult_assoc in H3.
-            rewrite <- Qmult_assoc in H3.
-            assert (ex * /n == /n * ex ) as H5.
-            { apply Qmult_comm. }
-            rewrite H5 in H3. rewrite Qmult_assoc in H3.
-            rewrite Qmult_assoc in H3. rewrite Qmult_inv_r in H3.
-            rewrite Qmult_1_l in H3. apply Qlt_le_weak. apply H3.
-            apply Qnot_eq_sym. apply Qlt_not_eq. apply Hn. 
-            apply Qinv_lt_0_compat. apply Hn.
-            apply Qnot_eq_sym. apply Qlt_not_eq. apply Hnu.
-            apply Hnu.
-            - destruct a as [H1 H2]. rewrite H2. unfold Qdiv.
-            simpl. rewrite <- Qmult_assoc with (m:=/nu). 
-            rewrite Qmult_comm with (x:=/nu). rewrite Qmult_inv_r.
-            rewrite <- Qmult_assoc. rewrite Qmult_1_l. rewrite <- Qmult_assoc.
-            rewrite <- Qmult_comm. rewrite <- Qmult_assoc.
-            assert (/ n * n == n * / n).
-            { rewrite Qmult_comm. reflexivity. }
-            rewrite H. rewrite Qmult_inv_r. rewrite Qmult_1_r. apply Qle_refl.
-            apply Qnot_eq_sym. apply Qlt_not_eq. apply Hn.
-            apply Qnot_eq_sym. apply Qlt_not_eq. apply Hnu.
-        Qed.
-
-    
+    Import Lra.
+    Import FunctionProofs.
+    Import HelperLemmas.
 
     Theorem peg_maintenance_lower_bound :
-        forall
-            (timestamp : nat) 
-            (state_0 : State)
-            (state_1 : State) 
-            (offer : Offer),
-            (1 / extract_value (qStar)) < 
-            (reserve_ratio (state_0.(stableCoinState))) /\
-            offer.(action) = BuyStableCoin /\
-            ((1 - get_effective_fee (timestamp) (state_0) (state_1) (SellStableCoin)) * 
-            target_price (state_0.(stableCoinState))) > 
-            (extract_value (offer.(value))) /\
-            (get_effective_fee (timestamp) (state_0) (state_1) (SellStableCoin) >= 0)
-            ->
-            (get_rational_choice (SellStableCoin) 
-            (get_primary_market_offer (timestamp) (state_0) (state_1) (SellStableCoin)) 
-            (extract_value (offer.(value))) = Secondary -> False) /\
-            get_effective_fee (timestamp) (state_0) (state_1) (SellStableCoin) <=
-            (1 - (1 - extract_value (fusionFee)) * (1 - beta_decay_neg_fee (state_0) (timestamp))).
-    
+    forall
+        (timestamp : nat) 
+        (state_0 state_1 : State) 
+        (offer : Offer)    
+        (primaryMarketOffer secondaryMarketOffer sC e0 e1 b0 rr k 
+		betaDecayNegFeeVal effFee gamma q fusFee s_0 p_s_0 : R),
+    (state_1 = execute (state_0) (BetaDecayNegEvent (sC)) (timestamp)) ->
+	(q = fusion_ratio (state_0.(stableCoinState))) ->
+	(fusFee = extract_value (fusionFee)) ->
+	(s_0 = get_stablecoins (state_0.(stableCoinState).(reactorState))) ->
+	(s_0 > 1) ->
+	(p_s_0 = stablecoin_price (state_0.(stableCoinState))) ->
+    (e0 = target_price (state_0.(stableCoinState))) ->
+    (e1 = target_price (state_1.(stableCoinState))) ->
+	(e0 = e1) ->
+	(b0 = extract_value (betaDecayFee0)) ->
+	(rr = reserve_ratio (state_0.(stableCoinState))) ->
+	(rr > /extract_value (qStar)) ->
+	(k > 0) ->
+    (betaDecayNegFeeVal = k * b0) ->
+	(betaDecayNegFeeVal < 1) ->
+	(effFee = get_effective_fee (timestamp) (state_0) (state_1) (gamma) (betaDecayNegFeeVal) (SellStableCoin)) ->
+	(offer.(action) = BuyStableCoin) ->
+    (primaryMarketOffer = get_primary_market_offer (timestamp) (state_0) (state_1) (gamma) (betaDecayNegFeeVal) (SellStableCoin)) ->
+    (secondaryMarketOffer = offer.(value)) ->
+    (((1 - effFee) * target_price (state_0.(stableCoinState))) > (secondaryMarketOffer)) -> 
+	(gamma = ((1 - q) * s_0) / (((s_0 - 1) * (1 - betaDecayNegFeeVal) * q) + ((1 - q) * s_0))) ->  
+    (get_rational_choice (SellStableCoin) (primaryMarketOffer) (secondaryMarketOffer) = Primary) /\
+	(effFee = 1 - (((1 - fusFee) * (1 - betaDecayNegFeeVal)) / (1 - (q * betaDecayNegFeeVal)))).
     Proof.
-        intros. split.
-        - intros. destruct H as [H1 [H2 [H3 H4]]]. rewrite Qmult_comm in H3.
-          apply Qle_lt_trans with 
-          (x:= (1 + get_effective_fee timestamp state_0 state_1 BuyStableCoin) * 
-          neutron_price (state_0.(stableCoinState))) in H3.
-          simpl in H0. rewrite Qgt_alt in H3. simpl in H3. rewrite H3 in H0. 
-          discriminate H0. rewrite Qmult_comm. apply Qmult_le_compat_r.
-          * apply actual_price_le_target_price_neutron.
-          * apply nonnegative_plus_nonnegative.
-            + unfold Qle. simpl. lia.
-            + apply H4.
-        -  
+		intros 
+		timestamp state_0 state_1 offer primaryMarketOffer 
+		secondaryMarketOffer sC e0 e1 b0 rr k betaDecayNegFeeVal effFee gamma q 
+		fusFee s_0 p_s_0
+		Hs1s0 HqVal HfusFeeVal Hs_0Val Hs_0_gt_1 Hp_s_0Val He0val He1val He0e1 
+		Hb0val Hrrval Hrrrange Hkrange Hbetaval Hbetarange 
+		Hefffeeval Hofferaction Hpmo Hsmo Hsmorange Hgamma.
+		(*
+		 * Useful asserts
+		 *)
+		assert (stablecoin_price (state_0.(stableCoinState)) = 
+		target_price (state_0.(stableCoinState))) as HscPtP.
+		{
+			rewrite fusion_ratio_pegged_stablecoin_price_equals_target_price with 
+			(s := get_stablecoins (state_0.(stableCoinState).(reactorState))) 
+			(e := target_price (state_0.(stableCoinState))) 
+			(b := get_basecoins (state_0.(stableCoinState).(reactorState))); auto.
+			rewrite reserve_ratio_gt_q_star_fusion_ratio_pegged with
+			(s := get_stablecoins (state_0.(stableCoinState).(reactorState))) 
+			(e := target_price (state_0.(stableCoinState))) 
+			(b := get_basecoins (state_0.(stableCoinState).(reactorState))); auto.
+			rewrite Hrrval in Hrrrange. apply Hrrrange.
+		}
+		split.
+		(*
+         * Proving that choosing the secondary market for buying stable coins
+         * is an irrational choice
+         *)
+		- unfold get_rational_choice. destruct Rgt_dec.
+            + assert (primaryMarketOffer > secondaryMarketOffer).
+            {
+                rewrite Hpmo, Hsmo. unfold get_primary_market_offer.
+				rewrite HscPtP. rewrite Hefffeeval, Hsmo in Hsmorange.
+				apply Hsmorange.
+            } lra.
+            + reflexivity.
+		(*
+		 * Proving the value of the effective fee
+		 *)
+		-
+		(*
+		 * Proving required asserts
+		 *)
+		assert (p_s_0 > 0) as Hps0gt1 by (rewrite Hp_s_0Val; apply stablecoin_price_gt_0).
+		assert (betaDecayNegFeeVal > 0) as Hbetavalgt0. 
+		{
+			rewrite Hbetaval, Hb0val. destruct betaDecayFee0. simpl.
+			apply Rmult_pos_pos; lra.
+		}
+		assert (p_s_0 <> 0) as Hps0ne0 by (apply Rgt_not_eq; apply Hps0gt1).
+		assert ((s_0 - 1) * (1 - betaDecayNegFeeVal) * q + (1 - q) * s_0 <> 0) as Hdenomnonzero.
+		{
+			apply Rgt_not_eq. apply Rplus_pos_pos.
+			- repeat apply Rmult_pos_pos; [try lra | try lra | rewrite HqVal; apply fusion_ratio_gt_0]. 
+			- repeat apply Rmult_pos_pos; [apply Rgt_minus; rewrite HqVal; apply fusion_ratio_lt_1 | lra].
+		}
+		assert ((1 - betaDecayNegFeeVal) * q + (1 - q) <> 0) as Hbetadecayq.
+		{
+			apply Rgt_not_eq; apply Rplus_pos_pos; try apply Rmult_pos_pos; 
+			try apply Rgt_minus; try rewrite HqVal; 
+			try apply fusion_ratio_lt_1; try apply fusion_ratio_gt_0; try lra.
+		}
+		assert (1 - gamma = ((s_0 - 1) * (1 - betaDecayNegFeeVal) * (q)) / (((s_0 - 1) * (1 - betaDecayNegFeeVal) * (q)) + ((1 - q) * (s_0)))) as H1minusgamma.
+		{
+			rewrite Hgamma. field_simplify; auto.
+		}
+		assert (1 - (gamma / s_0) = ((s_0 - 1) * (((1 - betaDecayNegFeeVal) * (q)) + (1 - q))) / (((s_0 - 1) * (1 - betaDecayNegFeeVal) * (q)) + ((1 - q) * (s_0)))) as H1minusgammadivs0.
+		{
+			rewrite Hgamma. field_simplify; [reflexivity | auto | split; try lra].
+		}
+		assert ((1 - gamma) / (1 - (gamma / s_0)) = (((1 - betaDecayNegFeeVal) * q) / (1 - (q * betaDecayNegFeeVal)))) as Hgammasimpl.
+		{
+			rewrite H1minusgamma, H1minusgammadivs0; field_simplify; try lra.
+		}
+		rewrite Hefffeeval. unfold get_effective_fee. 
+		unfold base_coins_from_n_stable_coins. 
+		rewrite <- HfusFeeVal, <- Hs_0Val, <- Hp_s_0Val, <- HqVal. 
+		repeat rewrite Rmult_1_r.
+		rewrite Rmult_div_swap with (r1 := (1 - fusFee) * (1 - gamma)) 
+		(r2 := p_s_0).
+		rewrite Rmult_div_l; try auto.
+		rewrite a_mult_b_div_c_mult_b_eq_a_div_c_mult_b_div_d with
+		(a := 1 - fusFee) (b := 1 - gamma) (c := q) (d := 1 - gamma / s_0).
+		rewrite Hgammasimpl; field_simplify; repeat split; try lra; 
+		try apply Rgt_not_eq. try rewrite HqVal; try apply fusion_ratio_gt_0. 
     Qed.
-    
-End Theorem1.
+End Theorem2.
 
 
 

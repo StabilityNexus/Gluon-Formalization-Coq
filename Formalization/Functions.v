@@ -463,21 +463,52 @@ Module Functions.
     ((fInit * (1 - fissionFeeVal) * rInit * sNew) + 
     ((1 - fInit) * fracProtonsDecay * (1 - fissionFeeVal) * (1 - betaDecayPosFeeVal) * rNew * sInit)).
     
+
+    (*
+     * This function returns the base coins we get when converting 'n' 
+     * stablecoins into base coins where 'gamma' is the fraction of the 
+     * stablecoins we convert to reserve coins for the fusion reaction after the
+     * beta decay negative reaction.
+     * state_0: state before beta decay negative reaction
+     * timestamp: time when the beta decay negative reaction is initiated
+     * gamma: fraction of stablecoins that are converted to reserve coins
+     * stablecoins: stablecoins to be converted to base coins
+     *)
+
+    Definition base_coins_from_n_stable_coins
+        (state_0 : State)
+        (timestamp : nat)
+        (stable_coins : R)
+        (gamma : R) : R :=
+    let fusionFeeVal := extract_value (fusionFee) in
+    let stablecoinPriceVal := stablecoin_price (state_0.(stableCoinState)) in
+    let fusionRatioVal := fusion_ratio (state_0.(stableCoinState)) in
+    let stableCoinsCurrent := get_stablecoins (state_0.(stableCoinState).(reactorState)) in
+    ((1 - fusionFeeVal) * (1 - gamma) * stable_coins * stablecoinPriceVal)
+    / 
+    (fusionRatioVal * (1 - ((gamma * stable_coins) / (stableCoinsCurrent)))).
+
     
     (*
      * This function returns the effective fee in terms of base coins for the
      * action of selling/buying a stablecoin
+     * TODO: Make effective fee functions separate for buying and selling 
+     * stablecoins
      *)
     Definition get_effective_fee
         (timestamp : nat)
         (state_0 : State) 
         (state_1 : State)
-        (beta_decay_pos_fee_val : R)
+        (gamma : R)
+        (beta_decay_fee_val : R)
         (action : Action) : R :=
     match action with
-    | SellStableCoin => 0
+    | SellStableCoin => 
+        let baseCoinsFromOneStableCoin := base_coins_from_n_stable_coins (state_0) (timestamp) (1) (gamma) in
+        let stableCoinPriceBeforeBetaDecay := stablecoin_price (state_0.(stableCoinState)) in
+        1 - ((baseCoinsFromOneStableCoin) / (stableCoinPriceBeforeBetaDecay))
     | BuyStableCoin =>
-        let baseCoinsForOneStableCoin := base_coins_for_n_stable_coins (state_0) (timestamp) (state_1) (1) (beta_decay_pos_fee_val) (1) in
+        let baseCoinsForOneStableCoin := base_coins_for_n_stable_coins (state_0) (timestamp) (state_1) (1) (beta_decay_fee_val) (1) in
         let stableCoinPriceBeforeFission := stablecoin_price (state_0.(stableCoinState)) in
         (baseCoinsForOneStableCoin / stableCoinPriceBeforeFission) - 1
     end.
@@ -485,21 +516,23 @@ Module Functions.
     (*
      * This function returns the price of buying/selling a stablecoin in terms
      * of base coins
+     * TODO: Make this function separate for buying and selling stablecoins
      *)
     Definition get_primary_market_offer
         (timestamp : nat)
         (state_0 : State) 
-        (state_1 : State)  
-        (betaDecayPosFeeVal : R) 
+        (state_1 : State)
+        (gamma : R) 
+        (betaDecayFeeVal : R) 
         (action : Action) : R :=
     match action with
     | BuyStableCoin => 
         (1 + get_effective_fee 
-            (timestamp) (state_0) (state_1) (betaDecayPosFeeVal) (action)) *
+            (timestamp) (state_0) (state_1) (gamma) (betaDecayFeeVal) (action)) *
         (stablecoin_price (state_0.(stableCoinState)))
     | SellStableCoin =>  
-        (1 + get_effective_fee 
-            (timestamp) (state_0) (state_1) (betaDecayPosFeeVal) (action)) *
+        (1 - get_effective_fee 
+            (timestamp) (state_0) (state_1) (gamma) (betaDecayFeeVal) (action)) *
         (stablecoin_price (state_0.(stableCoinState)))
     end.
 
@@ -515,16 +548,16 @@ Module Functions.
         (action : Action) 
         (primaryMarketOffer : R) 
         (secondaryMarketOffer : R) : Choice :=
-        match action with
-        | BuyStableCoin =>
-            if Rlt_dec secondaryMarketOffer primaryMarketOffer
-            then Secondary
-            else Primary
-        | SellStableCoin =>
-            if Rgt_dec secondaryMarketOffer primaryMarketOffer
-            then Secondary
-            else Primary
-        end.
+    match action with
+    | BuyStableCoin =>
+        if Rlt_dec secondaryMarketOffer primaryMarketOffer
+        then Secondary
+        else Primary
+    | SellStableCoin =>
+        if Rgt_dec secondaryMarketOffer primaryMarketOffer
+        then Secondary
+        else Primary
+    end.
     
     (*
      * This function returns a proposition that states: Trace of state_0 is a 
@@ -533,8 +566,8 @@ Module Functions.
     Definition happened_after
         (state_0 : State)
         (state_1 : State) : Prop :=
-        state_0.(reactions) = 
-        firstn (length (state_0.(reactions))) (state_1.(reactions)).
+    state_0.(reactions) = 
+    firstn (length (state_0.(reactions))) (state_1.(reactions)).
         
     (*
      * This function checks if the stable coin state after executing a reaction
@@ -543,32 +576,32 @@ Module Functions.
      *)
     Fixpoint states_follow
         (reactions : Trace) : Prop :=
-        match reactions with
+    match reactions with
+    | nil => True
+    | (s_2, t_2, r_2) :: reactions' =>
+        match reactions' with
         | nil => True
-        | (s_2, t_2, r_2) :: reactions' =>
-            match reactions' with
-            | nil => True
-            | (s_1, t_1, e_1) :: reactions'' =>
-                match e_1 with
-                | FissionEvent (baseCoins) => 
-                    (s_2 = fission_reaction (s_1) (baseCoins)) /\ 
-                    states_follow (reactions')
-                | FusionEvent (baseCoins) =>
-                    (s_2 = fusion_reaction (s_1) (baseCoins)) /\ 
-                    states_follow (reactions')
-                | BetaDecayPosEvent (reserveCoins) =>
-                    let beta_decay_pos_fee_val := 
-                    beta_decay_pos_fee (e_1) (reactions'') (s_1) (t_1) in
-                    (s_2 = beta_decay_pos_reaction (s_1) (beta_decay_pos_fee_val) (reserveCoins)) /\
-                    states_follow (reactions')
-                | BetaDecayNegEvent (stableCoins) =>
-                    let beta_decay_neg_fee_val := 
-                    beta_decay_neg_fee (e_1) (reactions'') (s_1) (t_1) in
-                    (s_2 = beta_decay_neg_reaction (s_1) (beta_decay_neg_fee_val) (stableCoins)) /\
-                    states_follow (reactions')
-                end
+        | (s_1, t_1, e_1) :: reactions'' =>
+            match e_1 with
+            | FissionEvent (baseCoins) => 
+                (s_2 = fission_reaction (s_1) (baseCoins)) /\ 
+                states_follow (reactions')
+            | FusionEvent (baseCoins) =>
+                (s_2 = fusion_reaction (s_1) (baseCoins)) /\ 
+                states_follow (reactions')
+            | BetaDecayPosEvent (reserveCoins) =>
+                let beta_decay_pos_fee_val := 
+                beta_decay_pos_fee (e_1) (reactions'') (s_1) (t_1) in
+                (s_2 = beta_decay_pos_reaction (s_1) (beta_decay_pos_fee_val) (reserveCoins)) /\
+                states_follow (reactions')
+            | BetaDecayNegEvent (stableCoins) =>
+                let beta_decay_neg_fee_val := 
+                beta_decay_neg_fee (e_1) (reactions'') (s_1) (t_1) in
+                (s_2 = beta_decay_neg_reaction (s_1) (beta_decay_neg_fee_val) (stableCoins)) /\
+                states_follow (reactions')
             end
-        end.
+        end
+    end.
 
     Fixpoint timestamps_increase 
         (reactions : Trace) : Prop :=

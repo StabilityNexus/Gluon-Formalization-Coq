@@ -31,7 +31,8 @@ Module Theorem1.
         (state_0 : State)
         (state_1 : State) 
         (offer : Offer)
-        (betaDecayPosFeeVal : R)    
+        (betaDecayPosFeeVal : R)
+		(gamma : R)  
         (k rr fissFee b0 effFee primaryMarketOffer secondaryMarketOffer e0 e1 : R),
     (k > 0) ->
     (m > 0) ->
@@ -42,9 +43,9 @@ Module Theorem1.
     rr = reserve_ratio (state_0.(stableCoinState)) ->
     fissFee = extract_value (fissionFee) ->
     b0 = extract_value (betaDecayFee0) ->
-    effFee = get_effective_fee (timestamp) (state_0) (state_1) (betaDecayPosFeeVal) (BuyStableCoin) ->
+    effFee = get_effective_fee (timestamp) (state_0) (state_1) (gamma) (betaDecayPosFeeVal) (BuyStableCoin) ->
     offer.(action) = SellStableCoin ->
-    primaryMarketOffer = get_primary_market_offer (timestamp) (state_0) (state_1) (betaDecayPosFeeVal) (BuyStableCoin) ->
+    primaryMarketOffer = get_primary_market_offer (timestamp) (state_0) (state_1) (gamma) (betaDecayPosFeeVal) (BuyStableCoin) ->
     secondaryMarketOffer = offer.(value) ->
     (/extract_value (qStar)) < rr ->
     ((1 + effFee) * target_price (state_0.(stableCoinState))) < (offer.(value)) ->
@@ -66,7 +67,7 @@ Module Theorem1.
             + assert (primaryMarketOffer < secondaryMarketOffer).
             {
                 rewrite H10. rewrite H11. unfold get_primary_market_offer.
-                apply Rle_lt_trans with (r2 := (1 + get_effective_fee timestamp state_0 state_1 betaDecayPosFeeVal BuyStableCoin) * target_price (stableCoinState state_0)); [| nra].
+                apply Rle_lt_trans with (r2 := (1 + get_effective_fee timestamp state_0 state_1 gamma betaDecayPosFeeVal BuyStableCoin) * target_price (stableCoinState state_0)); [| nra].
                 - apply Rmult_le_compat_l; [| apply actual_price_le_target_price_neutron].
                     + apply Rplus_le_le_0_compat; lra.
             } lra.

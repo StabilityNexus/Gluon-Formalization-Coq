@@ -229,4 +229,22 @@ Module HelperLemmas.
         field.
         assumption.
     Qed.
+
+    Lemma a_mult_b_div_c_mult_b_eq_a_div_c_mult_b_div_d : forall (a b c d : R),
+        (a * b) / (c * d) = (a / c) * (b / d).
+    Proof.
+        intros a b c d; rewrite <- a_div_b_mult_c_div_d_imp_a_mult_c_div_b_mult_d; reflexivity.
+    Qed.
+
+    Lemma product_lt_1 : forall a b : R,
+        0 < a < 1 ->
+        0 < b < 1 ->
+        a * b < 1.
+    Proof.
+        intros a b [Ha_pos Ha_lt1] [Hb_pos Hb_lt1].
+        assert (H1: a * b < 1 * b) by (apply Rmult_lt_compat_r; assumption).
+        rewrite Rmult_1_l in H1.
+        apply Rlt_trans with (r2 := b); lra.
+    Qed.
+
 End HelperLemmas.
