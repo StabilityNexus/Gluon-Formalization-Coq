@@ -477,7 +477,6 @@ Module Functions.
 
     Definition base_coins_from_n_stable_coins
         (state_0 : State)
-        (timestamp : nat)
         (stable_coins : R)
         (gamma : R) : R :=
     let fusionFeeVal := extract_value (fusionFee) in
@@ -504,7 +503,7 @@ Module Functions.
         (action : Action) : R :=
     match action with
     | SellStableCoin => 
-        let baseCoinsFromOneStableCoin := base_coins_from_n_stable_coins (state_0) (timestamp) (1) (gamma) in
+        let baseCoinsFromOneStableCoin := base_coins_from_n_stable_coins (state_0) (1) (gamma) in
         let stableCoinPriceBeforeBetaDecay := stablecoin_price (state_0.(stableCoinState)) in
         1 - ((baseCoinsFromOneStableCoin) / (stableCoinPriceBeforeBetaDecay))
     | BuyStableCoin =>
