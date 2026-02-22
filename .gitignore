@@ -47,3 +47,7 @@ time-of-build-pretty.log
 
 # Coqpilot auxiliary files
 *_cp_aux.v
+
+# Makefiles
+Makefile.coq
+Makefile.coq.conf
