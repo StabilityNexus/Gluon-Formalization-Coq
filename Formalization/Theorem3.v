@@ -2,14 +2,17 @@ From StableCoinFormalization Require Export Datatypes.
 From StableCoinFormalization Require Export HelperFunctions.
 From StableCoinFormalization Require Export Functions.
 From StableCoinFormalization Require Export HelperLemmas.
-Require Export Lia.
+From Stdlib Require Export Lra.
 Local Open Scope R_scope.
+
 Module Theorem3.
     Import Datatypes.
     Import HelperFunctions.
     Import HelperLemmas.
     Import Functions.
     Import Lia.
+    Import Lra.
+    
     Theorem peg_robustness_during_market_crashes :
         forall
             (s1 s2 : State),

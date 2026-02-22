@@ -1,5 +1,5 @@
-Require Export Reals. 
-Require Export Lra.
+From Stdlib Require Export Reals.
+From Stdlib Require Lra.
 Local Open Scope R_scope.
 
 Module HelperLemmas.

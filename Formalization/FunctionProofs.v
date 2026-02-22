@@ -5,7 +5,7 @@ From StableCoinFormalization Require Export Datatypes.
 From StableCoinFormalization Require Export HelperFunctions.
 From StableCoinFormalization Require Export Functions.
 From StableCoinFormalization Require Export HelperLemmas.
-Require Export Lra.
+From Stdlib Require Export Lra.
 Local Open Scope R_scope.
 
 Module FunctionProofs.
@@ -13,6 +13,7 @@ Module FunctionProofs.
     Import Functions.
     Import HelperFunctions.
     Import HelperLemmas.
+    Import Lra.
 
     Lemma fusion_ratio_gt_0 :
         forall stableCoinState : StableCoinState,

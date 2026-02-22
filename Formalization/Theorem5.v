@@ -3,8 +3,9 @@ From StableCoinFormalization Require Export HelperFunctions.
 From StableCoinFormalization Require Export Functions.
 From StableCoinFormalization Require Export HelperLemmas.
 From StableCoinFormalization Require Export FunctionProofs.
-Require Export Lia.
+From Stdlib Require Lia.
 Local Open Scope R_scope.
+
 Module Theorem5.
     Import Datatypes.
     Import HelperFunctions.

@@ -1,8 +1,8 @@
 (*
  * Importing the Libraries
  *)
-Require Export List.
-Require Export Reals.
+From Stdlib Require List.
+From Stdlib Require Reals.
 From StableCoinFormalization Require Export HelperFunctions.
 
 Module Datatypes.

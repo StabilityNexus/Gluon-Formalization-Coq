@@ -1,4 +1,4 @@
-Require Export Reals.
+From Stdlib Require Reals.
 Module HelperFunctions.
     Import Reals.
     

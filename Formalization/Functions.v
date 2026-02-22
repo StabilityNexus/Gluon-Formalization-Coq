@@ -8,19 +8,16 @@
 (*
  * Importing the Libraries
  *)
+From Stdlib Require Export Reals.
 From StableCoinFormalization Require Export Datatypes.
 From StableCoinFormalization Require Export HelperFunctions.
-Require Export Lra.
-
 Local Open Scope R_scope.
 
 Module Functions.
     Import Datatypes.
     Import HelperFunctions.
     Import Bool.
-    Import Lra.
-    Import Lia.
-
+    Import List.
     (*
      * Defining Parameters
      *)
